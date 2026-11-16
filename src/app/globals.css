@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-50: #f6f0ff;
+  --color-brand-100: #ede0ff;
+  --color-brand-200: #dcc3ff;
+  --color-brand-300: #c79bff;
+  --color-brand-400: #ad6bff;
+  --color-brand-500: #9340ff;
+  --color-brand-600: #7a2bf0;
+  --color-brand-700: #6420cc;
+  --color-brand-800: #4f1aa3;
+  --color-brand-900: #3b1478;
+
+  --color-magenta: #c711fc;
+  --color-sky: #67adff;
+  --color-ink: #1c2142;
+  --color-muted: #5b6180;
+  --color-line: #e7e3f2;
+  --color-canvas: #f7f5fc;
+
+  --color-success: #0b7a55;
+  --color-success-soft: #e5f7ef;
+  --color-warning: #9a4a07;
+  --color-warning-soft: #fdf0d5;
+  --color-danger: #b42318;
+  --color-danger-soft: #fde8e6;
+  --color-info: #1857b8;
+  --color-info-soft: #e4eefc;
+
+  --color-chart-1: #7a2bf0;
+  --color-chart-2: #c711fc;
+  --color-chart-3: #67adff;
+  --color-chart-4: #1c2142;
+  --color-chart-5: #f59e0b;
+  --color-chart-6: #10b981;
+}
+
+@layer base {
+  html { color-scheme: light; }
+  body { @apply bg-canvas text-ink antialiased; }
+  :focus-visible { outline: 2px solid var(--color-brand-600); outline-offset: 2px; }
+}
+
+@utility brand-gradient {
+  background-image: linear-gradient(135deg, #7a2bf0 0%, #c711fc 100%);
+}
+
+/* A slim scrollbar for the dark menu: no arrow buttons, a soft thumb. */
+@utility sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+  &::-webkit-scrollbar { width: 6px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.28); border-radius: 999px; }
+  &::-webkit-scrollbar-button { display: none; height: 0; }
+}
+
+/* Dark sign-in screens: the shared fields and button are restyled inside this scope. */
+.auth-dark {
+  & label, & h1 { color: #fff; }
+  & .text-muted { color: rgb(255 255 255 / 0.62); }
+  & .text-brand-700 { color: #c79bff; }
+  & .text-danger { color: #ff8a80; }
+  & .text-success { color: #5ee0b0; }
+  & input {
+    background: rgb(255 255 255 / 0.06);
+    border-color: rgb(255 255 255 / 0.14);
+    color: #fff;
+  }
+  & input::placeholder { color: rgb(255 255 255 / 0.38); }
+  & input:hover { border-color: rgb(173 107 255 / 0.7); }
+  & input:focus { border-color: #ad6bff; background: rgb(255 255 255 / 0.09); }
+  & input:-webkit-autofill { -webkit-text-fill-color: #fff; box-shadow: 0 0 0 40px #1d1440 inset; }
+  & button[type="submit"] { width: 100%; height: 3rem; box-shadow: 0 10px 30px -8px rgb(147 64 255 / 0.65); }
+}
+
+/* Pages shown inside a modal already have the modal's title bar, so the page's own big heading is dropped and its subtitle stays. */
+.modal-body {
+  & > div:has(> div > h1) { margin-bottom: 1rem; }
+  & > div:has(> div > h1) h1 { display: none; }
+  & > div:has(> div > h1) p { margin-top: 0; }
+}
+
+/* Formatted text from the rich editor, in the editor and wherever it is shown. */
+.rich {
+  & ul { list-style: disc; padding-left: 1.4rem; margin: 0.25rem 0; }
+  & ol { list-style: decimal; padding-left: 1.4rem; margin: 0.25rem 0; }
+  & h1, & h2, & h3, & h4 { font-weight: 700; margin: 0.35rem 0; }
+  & h1 { font-size: 1.25rem; } & h2 { font-size: 1.1rem; }
+}
+
+/* A protected window that was clicked outside of: a short side-to-side shake. */
+@keyframes shake {
+  0%, 100% { translate: 0; }
+  20%, 60% { translate: -8px; }
+  40%, 80% { translate: 8px; }
+}
+.shake { animation: shake 0.4s ease-in-out; }
