@@ -6,6 +6,7 @@ const quoteLineSchema = z.object({
   customName: z.string().trim().default(""),
   price: z.coerce.number({ message: "Each package needs a price." }).positive("Each package price must be greater than zero."),
   scope: z.string().trim().min(1, "Each package needs a scope."),
+  icon: z.string().default(""),
 });
 
 export const quotationSchema = z.object({

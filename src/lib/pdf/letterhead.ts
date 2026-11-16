@@ -21,9 +21,11 @@ export type LetterheadInput = {
   cover?: { title?: string; preparedFor?: string; department?: string; source?: string; preparedBy?: string; period?: string; date?: string };
   profile?: boolean;
   skipCover?: boolean;
+  /** White header with the dark logo, like the quotation and the marketing report. */
+  lightHead?: boolean;
 };
 
-export function wrapLetterhead({ title, body, extraCss = "", cover = {}, profile = false, skipCover = false }: LetterheadInput, assets: { logo: string; font: string }): string {
+export function wrapLetterhead({ title, body, extraCss = "", cover = {}, profile = false, skipCover = false, lightHead = false }: LetterheadInput, assets: { logo: string; font: string }): string {
   const heading = cover.title || title || "Report";
   const preparedFor = cover.preparedFor || "Client";
   const department = cover.department ?? "Neon Labz CRM";
@@ -32,7 +34,7 @@ export function wrapLetterhead({ title, body, extraCss = "", cover = {}, profile
   const subtitle = [cover.period, department, preparedFor ? `Prepared for ${preparedFor}` : ""].filter(Boolean).join("  •  ");
   const dateLabel = formatCoverDate(cover.date);
   const kicker = profile ? "CLIENT PROFILE" : "";
-  const headClass = profile ? "doc-head profile-head" : "doc-head";
+  const headClass = `${profile ? "doc-head profile-head" : "doc-head"}${lightHead ? " light-head" : ""}`;
   const footClass = profile ? "doc-foot profile-foot" : "doc-foot";
 
   return `<!doctype html>
@@ -61,6 +63,9 @@ export function wrapLetterhead({ title, body, extraCss = "", cover = {}, profile
     }
     .doc-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 40px; min-height: 84px; box-sizing: border-box; background: #0B1026; border-bottom: 3px solid #873CFF; }
     .doc-head img { height: 36px; width: auto; display: block; }
+    .doc-head.light-head { background: #fff; border-top: 5px solid #873CFF; border-bottom: 1px solid #E5E7EB; min-height: 88px; }
+    .light-head img { height: 34px; }
+    .light-head .head-copy { color: #6B7280; }
     .doc-kicker { display: block; color: #873CFF; font-weight: 800; letter-spacing: .16em; font-size: 10px; margin-bottom: 3px; }
     .head-copy { text-align: right; font-size: 11px; color: #D1D5DB; line-height: 1.45; }
     .head-copy p { margin: 0; }

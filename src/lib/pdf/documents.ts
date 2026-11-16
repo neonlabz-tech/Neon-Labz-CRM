@@ -3,6 +3,7 @@ import type { InferSchemaType } from "mongoose";
 import { docDate, extractScopeBullets, money, renderBrandDocument, type BrandModel } from "./brand";
 import { escapeHtml, formatCoverDate, wrapLetterhead } from "./letterhead";
 import { renderQuotationDocument } from "./quotation-doc";
+import { resolveIcon } from "../package-icons";
 
 export type Assets = { logo: string; font: string };
 
@@ -71,15 +72,15 @@ function moneyLabel(value: unknown): string {
 
 export type QuoteInput = {
   number: string; client: string; date: string; terms: string; address?: string; valid?: string; email?: string; phone?: string;
-  items: { packageName: string; price: number; scope: string }[];
+  items: { packageName: string; price: number; scope: string; service?: string | null; period?: string | null; icon?: string | null }[];
   subtotal: number; discountPercent: number; discount: number; total: number;
 };
 
 export function quotationHtml(quote: QuoteInput, assets: Assets): string {
   return renderQuotationDocument({
-    number: quote.number, client: quote.client, address: quote.address ?? "", contact: [quote.email, quote.phone].filter(Boolean).join(" · "),
+    number: quote.number, client: quote.client, address: quote.address ?? "", email: quote.email ?? "", phone: quote.phone ?? "",
     date: quote.date, valid: quote.valid ?? "",
-    items: quote.items.map((line) => ({ name: line.packageName, scopeHtml: richToHtml(text(line.scope)), price: line.price })),
+    items: quote.items.map((line) => ({ name: line.packageName, sub: [line.service, line.period].filter((part) => part && part !== "Custom quotation").join(" · "), icon: resolveIcon(line.icon, line.packageName, line.service ?? ""), scopeHtml: richToHtml(text(line.scope)), price: line.price })),
     subtotal: quote.subtotal, discountPercent: quote.discountPercent, discount: quote.discount, total: quote.total, terms: quote.terms,
   }, assets.logo, assets.font);
 }
@@ -98,6 +99,13 @@ function splitBullets(scope: string[]): Pick<BrandModel, "scopeItems" | "feature
   return { scopeItems: scope.slice(0, mid || scope.length), featureItems: scope.slice(mid) };
 }
 
+function invoiceLines(items: { packageName: string; price: number }[], total: number): BrandModel["lines"] {
+  const rows: BrandModel["lines"] = items.map((item, index) => ({ name: item.packageName || `Package ${index + 1}`, detail: "", qty: "01", rate: money(item.price), amount: money(item.price) }));
+  const sum = items.reduce((n, item) => n + item.price, 0);
+  if (total && sum - total > 0.5) rows.push({ name: "Offer discount", detail: "", qty: "—", rate: "—", amount: `- ${money(sum - total)}` });
+  return rows;
+}
+
 /** `paid` is what has already been confirmed for the quotation; the receipt itself shows only what this payment covers. */
 export function receiptHtml(receipt: ReceiptInput, quote: ReceiptQuote | null, assets: Assets, paid = 0): string {
   const approved = receipt.approval === "approved";
@@ -114,8 +122,8 @@ export function receiptHtml(receipt: ReceiptInput, quote: ReceiptQuote | null, a
     documentId: receipt.receiptNo,
     documentDate: docDate(receipt.date),
     documentMeta: "Project / Per project",
-    // One line: what this payment covers and how much of it was paid now, not the whole quotation.
-    lines: [{ name: items.map((item) => item.packageName).filter(Boolean).join(", ") || "Service", detail: receipt.type, qty: "01", rate: money(receipt.amount), amount: money(receipt.amount) }],
+    // One row per package on the quotation, so five packages show as five rows. The box below shows what this payment covers.
+    lines: invoiceLines(items, quote?.items.length ? total : 0),
     ...splitBullets(items.flatMap((item) => extractScopeBullets(item.scope))),
     investmentLabel: approved ? "Amount paid" : "Amount due",
     investment: receipt.amount,
@@ -283,73 +291,6 @@ export function proposalHtml(proposal: ProposalInput, assets: Assets): string {
 
 /* ---------- Marketing: report, info sheet, content plan ---------- */
 
-function percentValue(value: unknown): string {
-  const raw = text(value).trim();
-  if (!raw) return "";
-  return raw.endsWith("%") ? raw : `${raw}%`;
-}
-
-function metricCards(pairs: [string, string][]): string {
-  const filled = pairs.filter(([, value]) => value.trim());
-  if (!filled.length) return "";
-  return `<div class="metrics">${filled.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}</div>`;
-}
-
-function sectionBlock(title: string, intro: string, cards: string): string {
-  if (!intro && !cards) return "";
-  return `<h2>${escapeHtml(title)}</h2>${intro ? `<p>${escapeHtml(intro)}</p>` : ""}${cards}`;
-}
-
-type PlatformStats = Record<string, string | null | undefined> & { analysisImages?: string[] };
-
-function platformHasData(stats: PlatformStats | undefined): stats is PlatformStats {
-  return Boolean(stats) && (Object.entries(stats!).some(([key, value]) => key !== "analysisImages" && hasText(value)) || Boolean(stats!.analysisImages?.length));
-}
-
-function platformBlock(label: string, stats: PlatformStats | undefined): string {
-  if (!platformHasData(stats)) return "";
-  const v = (key: string) => text(stats[key]);
-  const images = (stats.analysisImages ?? []).map((src) => `<figure class="analysis-shot pdf-keep"><img src="${escapeHtml(src)}" alt="Final analysis" /></figure>`).join("");
-  return `
-    <section class="platform-block">
-      <p class="kicker">${escapeHtml(label)}</p>
-      ${sectionBlock("Performance overview", v("overview"), metricCards([["Total views", v("totalViews")], ["Viewers", v("viewers")], ["Visits", v("visits")], ["Content interactions", v("interactions")], ["Three-second video views", v("videoViews")], ["Watch time", v("watchTime")], ["New followers", v("newFollowers")], ["Conversations started", v("conversations")]]))}
-      ${sectionBlock("Audience reach", v("audienceNote"), metricCards([["Non-follower views", percentValue(v("nonFollowerPercent"))], ["Follower views", percentValue(v("followerPercent"))]]))}
-      ${sectionBlock("Content performance", v("contentIntro"), metricCards([["Reels views", v("reelsViews")], ["Photo views", v("photoViews")], ["Content interactions", v("contentInteractions")], ["Photo interactions", v("photoInteractions")], ["Reels interactions", v("reelsInteractions")], ["Stories interactions", v("storiesInteractions")]]))}
-      ${v("videoNote") ? `<h2>Video performance</h2><p>${escapeHtml(v("videoNote"))}</p>` : ""}
-      ${images ? `<h2>Final analysis</h2>${images}` : ""}
-    </section>`;
-}
-
-export type MarketingReportInput = {
-  clientName: string; title: string; startDate: string; endDate: string; nextActions: string[]; contentDirection?: Text; clientSummary: string;
-  platforms: Partial<Record<string, PlatformStats>>;
-};
-
-const PLATFORMS: [string, string][] = [["facebook", "Facebook"], ["instagram", "Instagram"], ["tiktok", "TikTok"], ["youtube", "YouTube"], ["linkedin", "LinkedIn"]];
-
-export function marketingReportHtml(report: MarketingReportInput, clientCode: string, assets: Assets): string {
-  const actions = report.nextActions.map((item) => item.trim()).filter(Boolean);
-  const used = PLATFORMS.filter(([id]) => platformHasData(report.platforms[id])).map(([, label]) => label).join(", ") || "Social media";
-  const sections = PLATFORMS.map(([id, label]) => platformBlock(label, report.platforms[id])).join("");
-  const period = periodLabel(report.startDate, report.endDate);
-  return wrapLetterhead({
-    title: `${report.clientName} ${report.title || "Report"}`.trim(),
-    skipCover: true,
-    cover: { title: report.title || "Monthly Social Media Report", preparedFor: report.clientName, period, department: "Marketing", source: "Social media report", date: report.endDate, preparedBy: "Marketing team" },
-    body: `
-      <p class="kicker">Digital marketing report</p>
-      <h1>${escapeHtml(report.clientName)}</h1>
-      <p>${escapeHtml(report.title || "Monthly Social Media Report")}</p>
-      <p class="meta">${escapeHtml(period)} · ${escapeHtml(used)} · Client ID ${escapeHtml(clientCode || "—")}</p>
-      ${sections || "<p>No platform metrics recorded.</p>"}
-      ${actions.length ? `<h2>Monthly insights and next actions</h2><ul>${actions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : ""}
-      ${report.contentDirection ? `<h2>Content direction</h2><p>${escapeHtml(text(report.contentDirection))}</p>` : ""}
-      ${report.clientSummary ? `<h2>Client summary</h2><p>${escapeHtml(report.clientSummary)}</p>` : ""}
-    `,
-  }, assets);
-}
-
 function fieldValue(value: unknown): string {
   return escapeHtml(text(value).trim() || "—");
 }
@@ -401,6 +342,7 @@ export function infoHtml(client: InfoInput, clientCode: string, assets: Assets):
     return `<tr><td>${label}</td><td>${fieldValue(value)}</td></tr>`;
   }).join("");
   return wrapLetterhead({
+    lightHead: true,
     title: `${brand} client profile`,
     profile: true,
     cover: { preparedFor: brand },
@@ -490,6 +432,7 @@ export function planHtml(plan: PlanInput, clientName: string, assets: Assets): s
       ${adTable(month.ad)}`;
   }).join("");
   return wrapLetterhead({
+    lightHead: true,
     title: plan.title || "Content plan",
     skipCover: true,
     cover: { title: plan.title || "Content plan", preparedFor: clientName || "Client", period: periodLabel(plan.startDate, plan.endDate), department: "Marketing", source: "Content plan", date: text(plan.endDate || plan.startDate), preparedBy: "Marketing team" },

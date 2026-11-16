@@ -78,7 +78,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                 <SlipView url={r.proofUrl || undefined} />
               </DialogButton>
             ) },
-            { header: "Receipt PDF", cell: (r) => (receipt.has(String(r._id)) ? <PdfLink kind="receipt" id={receipt.get(String(r._id))!.id} /> : "—") },
+            { header: "Receipt PDF", cell: (r) => (receipt.has(String(r._id)) && r.status === "confirmed" ? <PdfLink kind="receipt" id={receipt.get(String(r._id))!.id} /> : "—") },
           ]}
         />
       )}

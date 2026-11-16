@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CATEGORIES, DURATIONS } from "@/models/package";
+import { ICON_IDS } from "@/lib/package-icons";
 
 export const packageSchema = z.object({
   id: z.string().optional(),
@@ -12,5 +13,6 @@ export const packageSchema = z.object({
     .string()
     .default("")
     .transform((value) => value.split("\n").map((line) => line.trim()).filter(Boolean)),
+  icon: z.union([z.literal(""), z.string().refine((id) => ICON_IDS.includes(id), "Choose an icon from the list.")]).default(""),
   status: z.enum(["active", "archived"]).default("active"),
 });

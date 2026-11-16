@@ -1,13 +1,18 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 const t = { type: String, default: "" };
+const row = new mongoose.Schema({ label: t, value: t }, { _id: false });
+const post = new mongoose.Schema({ title: t, views: t }, { _id: false });
+/** A screenshot kept in Cloudflare R2, with an optional caption. */
+const shot = new mongoose.Schema({ url: t, caption: t }, { _id: false });
 const stats = new mongoose.Schema(
   {
-    overview: t, totalViews: t, viewers: t, visits: t, interactions: t, videoViews: t, watchTime: t, newFollowers: t, conversations: t,
-    nonFollowerPercent: t, followerPercent: t, audienceNote: t,
-    contentIntro: t, reelsViews: t, photoViews: t, contentInteractions: t, photoInteractions: t, reelsInteractions: t, storiesInteractions: t, videoNote: t,
-    /** Public Cloudflare R2 links of the uploaded screenshots. */
-    analysisImages: { type: [String], default: [] },
+    intro: t,
+    metrics: { type: [row], default: [] },
+    analysis: t,
+    posts: { type: [post], default: [] },
+    audience: { type: [row], default: [] },
+    shots: { type: [shot], default: [] },
   },
   { _id: false }
 );

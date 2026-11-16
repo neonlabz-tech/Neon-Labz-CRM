@@ -6,12 +6,12 @@ import { requireAction } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { connectDb } from "@/lib/db";
 import { done, fail, invalid } from "@/lib/form";
-import { REPORT_PLATFORMS, SOCIALS, STAT_KEYS } from "@/lib/marketing";
+import { REPORT_PLATFORMS, SOCIALS, platformHasData, type PlatformData } from "@/lib/marketing";
 import { deleteFromR2 } from "@/lib/r2";
 import { uploadFile } from "@/lib/uploads";
 import { isId } from "@/lib/project-access";
 import { seal } from "@/lib/secrets";
-import { infoSchema, planSchema, reportSchema } from "@/schemas/marketing";
+import { infoSchema, planSchema, platformInputSchema, reportSchema } from "@/schemas/marketing";
 import { Client } from "@/models/client";
 import { MarketingInfo } from "@/models/marketing-info";
 import { MarketingPlan } from "@/models/marketing-plan";
@@ -95,6 +95,47 @@ export async function deletePlanAction(id: string): Promise<ActionState> {
 
 const MAX_IMAGES = 12;
 
+/** Reads one platform of the report form. Screenshots that are already saved are kept only if they really belong to this report. */
+async function readPlatform(platform: string, formData: FormData, before: string[], fresh: string[]): Promise<{ data: PlatformData; kept: string[] } | { error: string }> {
+  let json: unknown = {};
+  try {
+    json = JSON.parse(String(formData.get(`${platform}_data`) ?? "{}"));
+  } catch {
+    return { error: "A platform's details could not be read. Please try again." };
+  }
+  const parsed = platformInputSchema.safeParse(json);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the platform details." };
+  const input = parsed.data;
+
+  const saved = new Set(before);
+  const shots: { url: string; caption: string }[] = [];
+  for (const shot of input.shots) {
+    if (shot.url) {
+      if (saved.has(shot.url)) shots.push({ url: shot.url, caption: shot.caption });
+      continue;
+    }
+    const file = formData.get(`${platform}_file_${shot.key}`);
+    if (!(file instanceof File) || file.size === 0) continue;
+    const upload = await uploadFile(file, "marketing", { images: true, maxMb: 5, what: "analysis image" });
+    if (upload.error !== undefined) return { error: upload.error };
+    fresh.push(upload.url);
+    shots.push({ url: upload.url, caption: shot.caption });
+  }
+  if (shots.length > MAX_IMAGES) return { error: `Keep ${platform} to ${MAX_IMAGES} images or fewer.` };
+
+  return {
+    data: {
+      intro: input.intro,
+      analysis: input.analysis,
+      metrics: input.metrics.filter((m) => m.label && m.value),
+      posts: input.posts.filter((p) => p.title),
+      audience: input.audience.filter((a) => a.label && a.value),
+      shots,
+    },
+    kept: shots.map((s) => s.url),
+  };
+}
+
 export async function saveReportAction(_: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireAction("marketing.manage");
   const parsed = reportSchema.safeParse(Object.fromEntries(formData));
@@ -108,36 +149,21 @@ export async function saveReportAction(_: ActionState, formData: FormData): Prom
 
   const fresh: string[] = [];
   const removed: string[] = [];
-  const platforms: Record<string, Record<string, unknown>> = {};
+  const platforms: Record<string, PlatformData> = {};
   for (const [platform] of REPORT_PLATFORMS) {
-    const stats: Record<string, unknown> = {};
-    for (const key of STAT_KEYS) stats[key] = String(formData.get(`${platform}_${key}`) ?? "").trim().slice(0, 2000);
-
-    const before = (existing?.platforms?.[platform]?.analysisImages ?? []) as string[];
-    const drop = new Set(formData.getAll(`${platform}_remove`).map(String));
-    const kept = before.filter((url) => !drop.has(url));
-    removed.push(...before.filter((url) => drop.has(url)));
-
-    const files = formData.getAll(`${platform}_images`).filter((f): f is File => f instanceof File && f.size > 0);
-    if (kept.length + files.length > MAX_IMAGES) return fail(`Keep ${platform} to ${MAX_IMAGES} images or fewer.`);
-    const added: string[] = [];
-    for (const file of files) {
-      const upload = await uploadFile(file, "marketing", { images: true, maxMb: 5, what: "analysis image" });
-      if (upload.error !== undefined) {
-        await Promise.all([...fresh, ...added].map(deleteFromR2));
-        return fail(upload.error);
-      }
-      added.push(upload.url);
+    const before = (existing?.platforms?.[platform]?.shots ?? []).map((s) => s.url).filter(Boolean) as string[];
+    const result = await readPlatform(platform, formData, before, fresh);
+    if ("error" in result) {
+      await Promise.all(fresh.map(deleteFromR2));
+      return fail(result.error);
     }
-    fresh.push(...added);
-    stats.analysisImages = [...kept, ...added];
-    platforms[platform] = stats;
+    removed.push(...before.filter((url) => !result.kept.includes(url)));
+    platforms[platform] = result.data;
   }
 
-  const hasData = Object.values(platforms).some((p) => Object.entries(p).some(([k, v]) => (k === "analysisImages" ? (v as string[]).length > 0 : Boolean(v))));
-  if (!hasData) {
+  if (!Object.values(platforms).some((p) => platformHasData(p))) {
     await Promise.all(fresh.map(deleteFromR2));
-    return fail("Record metrics or add images for at least one social platform.");
+    return fail("Add numbers, notes or screenshots for at least one social platform.");
   }
 
   const nextActions = formData.getAll("nextActions").map((v) => String(v).trim().slice(0, 500)).filter(Boolean).slice(0, 20);
@@ -160,7 +186,7 @@ export async function deleteReportAction(id: string): Promise<ActionState> {
   await connectDb();
   const report = isId(id) ? await MarketingReport.findByIdAndDelete(id).select("platforms pdfUrl").lean() : null;
   if (!report) return fail("Report not found.");
-  const urls = REPORT_PLATFORMS.flatMap(([p]) => (report.platforms?.[p]?.analysisImages ?? []) as string[]);
+  const urls = REPORT_PLATFORMS.flatMap(([p]) => (report.platforms?.[p]?.shots ?? []).map((s) => s.url).filter(Boolean) as string[]);
   await Promise.all([...urls, ...(report.pdfUrl ? [report.pdfUrl] : [])].map(deleteFromR2));
   await writeAudit(user.username, "marketing.report.deleted", { id });
   revalidatePath("/marketing/reports");

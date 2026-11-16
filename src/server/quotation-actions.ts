@@ -13,6 +13,7 @@ import { quoteFigures, round2 } from "@/lib/money";
 import { ownerScope } from "@/lib/permissions";
 import { deleteFromR2 } from "@/lib/r2";
 import { reservedAmount } from "@/lib/payments";
+import { resolveIcon } from "@/lib/package-icons";
 import { quotationSchema } from "@/schemas/quotation";
 import { Lead } from "@/models/lead";
 import { Package } from "@/models/package";
@@ -38,7 +39,7 @@ export async function saveQuotationAction(_: ActionState, formData: FormData): P
   if (!dateIsAllowed(valid, existing?.valid ?? "")) return fail("Validity date cannot be before today.");
 
   const ids = input.lines.map((l) => l.packageId).filter((id) => id !== "custom");
-  const packages = await Package.find({ _id: { $in: ids } }).select("name category duration").lean();
+  const packages = await Package.find({ _id: { $in: ids } }).select("name category duration icon").lean();
   const items = [];
   for (const line of input.lines) {
     const custom = line.packageId === "custom";
@@ -52,6 +53,7 @@ export async function saveQuotationAction(_: ActionState, formData: FormData): P
       packageName,
       service: custom ? "" : pkg!.category,
       period: custom ? "Custom quotation" : pkg!.duration,
+      icon: resolveIcon(line.icon || (custom ? "" : pkg!.icon), packageName, custom ? "" : pkg!.category),
       price: round2(line.price),
       scope: cleanRich(line.scope),
     });

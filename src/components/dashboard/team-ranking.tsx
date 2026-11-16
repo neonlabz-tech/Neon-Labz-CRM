@@ -41,7 +41,7 @@ export async function TeamRanking({ year, month, prefix }: { year: string; month
       {rows.length > 0 && rows.length <= CARD_LIMIT && (
         <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map((row, index) => (
-            <li key={row.username} className="rounded-2xl border border-line bg-white p-4 text-sm">
+            <li key={row.username} className="rounded-2xl border border-line bg-[#F1E8FF] p-4 text-sm">
               <div className="flex items-center gap-3">
                 <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-bold text-brand-700">{index + 1}</span>
                 <div className="min-w-0"><p className="truncate font-semibold">{row.name}</p><p className="truncate text-xs text-muted">{row.username}</p></div>

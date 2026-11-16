@@ -82,6 +82,7 @@ const GROUPS: AreaGroup[] = [
     title: "Admin",
     areas: [
       { title: "People & logins", icon: "users", tabs: [{ href: "/users", label: "People & logins", action: "users.manage" }] },
+      { title: "Reports", icon: "mreports", tabs: [{ href: "/company-reports", label: "Reports", action: "reports.company" }] },
       { title: "Activity log", icon: "audit", tabs: [{ href: "/audit", label: "Activity log", action: "audit.view" }] },
     ],
   },

@@ -17,7 +17,7 @@ const ICONS = {
 type Props = { groups: NavGroup[]; name: string; roleLabel: string; collapsedByDefault: boolean; bell: React.ReactNode };
 
 export function Sidebar({ groups, name, roleLabel, collapsedByDefault, bell }: Props) {
-  const background = "bg-gradient-to-b from-[#1c2142] via-[#4b1fa8] to-[#7a2bf0]";
+  const background = "bg-gradient-to-b from-[#1c2142] via-[#4b1fa8] to-[#1c2142]";
   const pathname = usePathname();
   const own = useSearchParams().get("own") === "1";
   const [collapsed, setCollapsed] = useState(collapsedByDefault);
@@ -43,7 +43,7 @@ export function Sidebar({ groups, name, roleLabel, collapsedByDefault, bell }: P
       <nav className="sidebar-scroll flex-1 space-y-5 overflow-y-auto pr-1" aria-label="Main">
         {groups.map((group) => (
           <div key={group.title}>
-            {!compact && group.title !== "Main" && <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-white/45">{group.title}</p>}
+            {!compact && group.title !== "Main" && <p className="mb-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-white/50">{group.title}</p>}
             <ul className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = ICONS[item.icon];
@@ -58,7 +58,7 @@ export function Sidebar({ groups, name, roleLabel, collapsedByDefault, bell }: P
                       title={compact ? item.label : undefined}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex items-center gap-3 rounded-xl border-b border-white/5 px-3 py-2.5 text-sm font-medium transition-colors",
+                        "flex items-center gap-3 rounded-xl border-b border-white/5 px-3 py-2.5 text-[14px] font-medium transition-colors",
                         compact && "justify-center",
                         active ? "bg-white/20 text-white shadow-inner" : "text-white/75 hover:bg-white/10 hover:text-white"
                       )}
@@ -78,8 +78,8 @@ export function Sidebar({ groups, name, roleLabel, collapsedByDefault, bell }: P
         <span className="brand-gradient flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white">{initials(name)}</span>
         {!compact && (
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-white">{name}</p>
-            <p className="truncate text-xs text-white/60">{roleLabel}</p>
+            <p className="truncate text-[14px] font-semibold text-white">{name}</p>
+            <p className="truncate text-[13px] text-white/60">{roleLabel}</p>
           </div>
         )}
         <form action={logoutAction}>
