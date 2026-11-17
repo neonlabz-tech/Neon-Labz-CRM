@@ -12,6 +12,7 @@ const schema = new mongoose.Schema(
     duration: { type: String, enum: DURATIONS, default: "Per project" },
     features: { type: [String], default: [] },
     cover: { type: String, default: "" },
+    icon: { type: String, default: "" },
     status: { type: String, enum: ["active", "archived"], default: "active" },
   },
   { timestamps: true }

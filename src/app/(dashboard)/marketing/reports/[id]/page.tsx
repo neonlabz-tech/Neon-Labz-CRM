@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import { ReportForm, type PlatformValues } from "@/components/marketing/report-form";
+import { ReportForm } from "@/components/marketing/report-form";
 import { Card, PageHeader } from "@/components/ui/card";
 import { requireAction } from "@/lib/auth";
 import { connectDb } from "@/lib/db";
-import { REPORT_PLATFORMS } from "@/lib/marketing";
+import { REPORT_PLATFORMS, emptyPlatform, type PlatformData } from "@/lib/marketing";
 import { isId } from "@/lib/project-access";
 import { MarketingInfo } from "@/models/marketing-info";
 import { MarketingReport } from "@/models/marketing-report";
@@ -20,7 +20,7 @@ export default async function EditReportPage({ params }: { params: Promise<{ id:
     MarketingInfo.find().select("clientCode clientName brandName").sort({ clientName: 1 }).limit(500).lean(),
   ]);
   if (!report) notFound();
-  const platforms = Object.fromEntries(REPORT_PLATFORMS.map(([key]) => [key, JSON.parse(JSON.stringify(report.platforms?.[key] ?? {})) as PlatformValues]));
+  const platforms = Object.fromEntries(REPORT_PLATFORMS.map(([key]) => [key, { ...emptyPlatform(), ...(JSON.parse(JSON.stringify(report.platforms?.[key] ?? {})) as Partial<PlatformData>) }]));
   return (
     <>
       <PageHeader title={report.title || `${report.clientName} report`} subtitle={`${report.startDate} to ${report.endDate}`} />

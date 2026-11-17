@@ -9,15 +9,15 @@ import { ActionForm } from "@/components/ui/form";
 import { formatMoney, quoteFigures } from "@/lib/money";
 import { saveQuotationAction } from "@/server/quotation-actions";
 
-type PackageOption = { id: string; name: string; price: number; scope: string };
-type Line = { packageId: string; customName: string; price: string; scope: string };
+type PackageOption = { id: string; name: string; price: number; scope: string; icon: string };
+type Line = { packageId: string; customName: string; price: string; scope: string; icon: string };
 type Props = {
   leadId: string;
   packages: PackageOption[];
   defaults: { date: string; valid: string; discount: number; terms: string; lines: Line[] };
 };
 
-const blank: Line = { packageId: "", customName: "", price: "", scope: "" };
+const blank: Line = { packageId: "", customName: "", price: "", scope: "", icon: "" };
 
 export function QuoteForm({ leadId, packages, defaults }: Props) {
   const [lines, setLines] = useState<Line[]>(defaults.lines.length ? defaults.lines : [blank]);
@@ -26,7 +26,7 @@ export function QuoteForm({ leadId, packages, defaults }: Props) {
   const update = (index: number, patch: Partial<Line>) => setLines((list) => list.map((line, i) => (i === index ? { ...line, ...patch } : line)));
   function choose(index: number, packageId: string) {
     const pkg = packages.find((p) => p.id === packageId);
-    update(index, pkg ? { packageId, price: String(pkg.price), scope: pkg.scope } : { packageId, price: "", scope: "" });
+    update(index, pkg ? { packageId, price: String(pkg.price), scope: pkg.scope, icon: pkg.icon } : { packageId, price: "", scope: "", icon: "" });
   }
   const figures = quoteFigures(lines.reduce((sum, l) => sum + (Number(l.price) || 0), 0), Number(discount));
 

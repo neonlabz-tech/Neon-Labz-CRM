@@ -39,9 +39,9 @@ export function BellMenu({ unread, items }: { unread: number; items: Item[] }) {
 
   return (
     <div ref={box} className="relative">
-      <button type="button" onClick={toggle} className="relative rounded-full border border-line bg-white p-2.5 text-ink shadow-sm hover:bg-brand-50" aria-label={`Notifications, ${shown} unread`} aria-expanded={open}>
+      <button type="button" onClick={toggle} className="brand-gradient relative rounded-full p-2.5 text-white shadow-sm transition-opacity hover:opacity-90" aria-label={`Notifications, ${shown} unread`} aria-expanded={open}>
         <Bell className="h-5 w-5" />
-        {shown > 0 && <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-danger px-1 text-[11px] font-bold text-white">{shown > 99 ? "99+" : shown}</span>}
+        {shown > 0 && <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-danger px-1 text-[11px] font-bold text-white ring-2 ring-white">{shown > 99 ? "99+" : shown}</span>}
       </button>
       {open && (
         <div className="absolute right-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-line bg-white shadow-xl">

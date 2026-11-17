@@ -56,3 +56,16 @@ export const reportSchema = z
     clientSummary: z.string().trim().min(1, "Add the client summary.").max(4000),
   })
   .refine((v) => v.endDate >= v.startDate, { path: ["endDate"], message: "The end date is before the start date." });
+
+const reportRow = z.object({ label: z.string().trim().max(120).default(""), value: z.string().trim().max(200).default("") });
+
+/** One platform of a marketing report, as the form sends it in a single JSON field. */
+export const platformInputSchema = z.object({
+  intro: z.string().trim().max(2000).default(""),
+  analysis: z.string().trim().max(2000).default(""),
+  metrics: z.array(reportRow).max(40).default([]),
+  posts: z.array(z.object({ title: z.string().trim().max(300).default(""), views: z.string().trim().max(60).default("") })).max(30).default([]),
+  audience: z.array(reportRow).max(30).default([]),
+  /** `key` names the file input of a new screenshot; `url` is set for one that is already saved. */
+  shots: z.array(z.object({ key: z.string().max(40).default(""), url: z.string().max(1000).default(""), caption: z.string().trim().max(200).default("") })).max(12).default([]),
+});

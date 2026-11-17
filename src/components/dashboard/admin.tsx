@@ -1,12 +1,10 @@
 import { ApprovalActions } from "@/components/sales/approval-actions";
 import { tableStyles } from "@/components/ui/data-table";
-import { Badge } from "@/components/ui/badge";
 import { PdfLink } from "@/components/ui/pdf-link";
 import { connectDb } from "@/lib/db";
 import { dateIn, group, periodNote, sum } from "@/lib/dashboard";
 import { todayISO } from "@/lib/dates";
 import { MONTHS, readPeriod } from "@/lib/finance";
-import { ROLE_LABEL } from "@/lib/permissions";
 import { formatMoney } from "@/lib/money";
 import { param, type SearchParams } from "@/lib/pagination";
 import { PROJECT_STATUS, PROJECT_TYPES } from "@/lib/projects";
@@ -23,12 +21,11 @@ import { Payment } from "@/models/payment";
 import { PasswordReset } from "@/models/password-reset";
 import { Project } from "@/models/project";
 import { Task } from "@/models/task";
-import { User } from "@/models/user";
 import { PeriodFilter } from "@/components/finance/period-filter";
 import { CompanyTarget } from "./company-target";
 import { TeamRanking } from "./team-ranking";
 import { companyGoals, periodTarget } from "@/lib/sales-targets";
-import { Bars, ChartGrid, Hero, Kpis, PALETTE, Panel, Ring, slices, Tabs, toCounts, type Slice } from "./widgets";
+import { Bars, ChartGrid, Kpis, PALETTE, Panel, Ring, slices, Tabs, toCounts, type Slice } from "./widgets";
 
 type Row = { _id: unknown; n: number };
 const total = (rows: Row[]) => rows[0]?.n ?? 0;
@@ -55,16 +52,14 @@ export async function AdminDashboard({ username, sp }: { username: string; sp: S
 async function Company({ prefix, note, year, month }: { prefix: string; note: string; year: string; month: string }) {
   const dates = dateIn(prefix, "date");
   const projectMatch = { archived: false, ...dateIn(prefix, "startDate", "dueDate") };
-  const [waiting, approved, salesRevenue, manualRevenue, status, ownCount, people, packages, packageKinds, perDepartment, departments, stages, payroll, expenses, revenues, confirmed, expenseKinds, salary, marketing, accounts, requests] = await Promise.all([
+  const [waiting, salesRevenue, manualRevenue, status, ownCount, people, packages, perDepartment, departments, stages, payroll, expenses, revenues, confirmed, expenseKinds, salary, requests] = await Promise.all([
     Invoice.find({ approval: "pending" }).select("receiptNo clientName salesOwner amount type date").sort({ createdAt: -1 }).limit(10).lean(),
-    Invoice.find({ approval: "approved", ...dates }).select("receiptNo clientName amount type").sort({ approvedAt: -1 }).limit(8).lean(),
     Payment.aggregate<Row>(sum("amount", { status: "confirmed", ...dates })),
     Revenue.aggregate<Row>(sum("amount", dates)),
     Project.aggregate<Row>(group("status", projectMatch)),
     Project.countDocuments({ ...projectMatch, owner: { $regex: "^SA_" } }),
     Employee.countDocuments({ status: "Active" }),
     Package.countDocuments({ status: "active" }),
-    Package.aggregate<Row>(group("category", { status: "active" })),
     Employee.aggregate<Row>(group("department", { status: "Active" })),
     Department.find().select("name").sort({ name: 1 }).lean(),
     Lead.aggregate<Row>(group("status", dates)),
@@ -74,8 +69,6 @@ async function Company({ prefix, note, year, month }: { prefix: string; note: st
     Payment.countDocuments({ status: "confirmed", ...dates }),
     Expense.aggregate<Row>([{ $match: dates }, { $group: { _id: "$category", n: { $sum: "$amount" } } }]),
     Payroll.aggregate<Row>([{ $match: { status: "Paid", ...dates } }, { $group: { _id: null, n: { $sum: { $add: ["$base", "$commission"] } } } }]),
-    MarketingInfo.aggregate<Row>(group("createdBy")),
-    User.aggregate<Row>(group("role", { active: true, role: { $ne: "superadmin" } })),
     PasswordReset.countDocuments({ purpose: "staff-request", status: "open", expiresAt: { $gt: new Date() } }),
   ]);
   const projectCounts = toCounts(status);
@@ -87,7 +80,7 @@ async function Company({ prefix, note, year, month }: { prefix: string; note: st
 
   return (
     <>
-      <Hero kicker="Neon Labz" title="Company dashboard" note={note} badge={waiting.length ? `${waiting.length} awaiting approval` : "All payments reviewed"} alert={waiting.length > 0} />
+      <CompanyTarget collected={total(salesRevenue)} target={periodTarget(company.monthlyTarget, year, month)} note={note} />
       <Kpis items={[
         { label: "Revenue", value: formatMoney(revenueTotal), hint: note },
         { label: "Projects", value: projectTotal },
@@ -96,7 +89,6 @@ async function Company({ prefix, note, year, month }: { prefix: string; note: st
         { label: "Packages", value: packages },
         { label: "Password requests", value: requests, hint: "Waiting for you" },
       ]} />
-      <CompanyTarget collected={total(salesRevenue)} target={periodTarget(company.monthlyTarget, year, month)} note={note} />
       <TeamRanking year={year} month={month} prefix={prefix} />
       <Panel title="Payment approval" empty={waiting.length ? undefined : "No payment is waiting for approval."}>
         {waiting.length > 0 && (
@@ -122,22 +114,7 @@ async function Company({ prefix, note, year, month }: { prefix: string; note: st
       <ChartGrid>
         <Bars title="Finance records" data={named([["Payroll", payroll], ["Expenses", expenses], ["Manual revenue entries", revenues], ["Project payments", confirmed]])} />
         <Bars title="Expenses" data={named(expenseRows)} format="money" />
-        <Bars title="Marketing documents per person" data={named(marketing.map((row) => [String(row._id), row.n]))} />
-        <Bars title="Packages" data={named(packageKinds.map((row) => [String(row._id), row.n]))} />
-        <Bars title="User accounts" data={named(accounts.map((row) => [ROLE_LABEL[row._id as keyof typeof ROLE_LABEL] ?? String(row._id), row.n]))} />
       </ChartGrid>
-      <Panel title="Approved payment invoices" empty={approved.length ? undefined : "Approved invoices appear here after you approve a payment."}>
-        {approved.length > 0 && (
-          <ul className="divide-y divide-line text-sm">
-            {approved.map((invoice) => (
-              <li key={String(invoice._id)} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
-                <span><code>{invoice.receiptNo}</code> · {invoice.clientName}</span>
-                <span className="flex items-center gap-3"><Badge tone="success">{invoice.type}</Badge><b>{formatMoney(invoice.amount)}</b><PdfLink kind="receipt" id={String(invoice._id)} label="View" /></span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Panel>
     </>
   );
 }
@@ -157,7 +134,6 @@ async function Own({ username, prefix }: { username: string; prefix: string }) {
   const counts = toCounts(byStatus);
   return (
     <>
-      <Hero kicker={username} title="Own projects" badge={`${counts["in-progress"] ?? 0} in progress`} />
       <Kpis items={[{ label: "Projects", value: projects.length }, { label: "In progress", value: counts["in-progress"] ?? 0 }, { label: "Clients", value: clients }, { label: "Tasks", value: tasks }, { label: "Marketing documents", value: docs + plans + reports }]} />
       <ChartGrid>
         <Ring title="Project status" data={slices(STATUS, counts)} />

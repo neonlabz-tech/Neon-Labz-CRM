@@ -26,6 +26,7 @@ export function usernameFor(role: Role, number: number) {
 export const ACTIONS = {
   "users.manage": ["superadmin"],
   "audit.view": ["superadmin"],
+  "reports.company": ["superadmin"],
   "finance.view": ["superadmin"],
   "hrms.manage": ["superadmin"],
   "packages.manage": ["superadmin"],

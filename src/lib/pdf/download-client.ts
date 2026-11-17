@@ -31,7 +31,7 @@ function slices(canvas: HTMLCanvasElement): Shot[] {
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, slice.width, slice.height);
     context.drawImage(canvas, 0, top, canvas.width, height, 0, 0, canvas.width, height);
-    shots.push({ bytes: dataUrlToBytes(slice.toDataURL("image/jpeg", 0.95)), width: slice.width, height: slice.height });
+    shots.push({ bytes: dataUrlToBytes(slice.toDataURL("image/jpeg", 0.98)), width: slice.width, height: slice.height });
   }
   return shots;
 }
@@ -123,6 +123,49 @@ const waitForImages = (doc: Document) =>
     setTimeout(resolve, 2000);
   }))));
 
+const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result));
+  reader.onerror = () => reject(new Error("image"));
+  reader.readAsDataURL(blob);
+});
+
+/** A picture inside an SVG cannot load other files, so every image has to be inlined first. Throws when one cannot be. */
+async function inlineImages(doc: Document): Promise<void> {
+  for (const image of Array.from(doc.querySelectorAll("img"))) {
+    const src = image.getAttribute("src") ?? "";
+    if (!src || src.startsWith("data:")) continue;
+    const response = await fetch(src, { credentials: "same-origin" });
+    if (!response.ok) throw new Error("image");
+    image.setAttribute("src", await blobToDataUrl(await response.blob()));
+  }
+}
+
+/**
+ * Draws the document with the browser's own renderer (the page is put inside an SVG and painted onto a canvas).
+ * Words, fonts and line positions come out exactly as in the preview, which html2canvas cannot promise.
+ */
+async function drawNative(doc: Document, width: number, height: number, scale: number): Promise<HTMLCanvasElement> {
+  const markup = new XMLSerializer().serializeToString(doc.documentElement);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><foreignObject x="0" y="0" width="${width}" height="${height}">${markup}</foreignObject></svg>`;
+  const image = new Image();
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("svg"));
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("canvas");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  context.getImageData(0, 0, 1, 1); // throws if the browser marked the picture as unsafe, so the caller can fall back
+  return canvas;
+}
+
 /** Fetches the finished document, draws every page and downloads the PDF. */
 export async function downloadPdf(htmlUrl: string, fallbackName: string): Promise<void> {
   const response = await fetch(htmlUrl, { credentials: "same-origin" });
@@ -165,9 +208,20 @@ export async function downloadPdf(htmlUrl: string, fallbackName: string): Promis
 
 
     const letterhead = Boolean(win.eval(PAGINATE_SCRIPT));
+    // Sharper pictures are better to read when zoomed, so draw at up to 3x. A browser cannot make a canvas taller than about 32,000 pixels, so long documents use a smaller scale.
+    const scaleFor = (height: number) => Math.max(1.5, Math.min(3, 30000 / height));
+    let native = true;
+    try { await inlineImages(doc); } catch (error) { native = false; console.warn("PDF: an image could not be inlined, using the fallback drawing", error); }
     const { default: html2canvas } = await import("html2canvas");
-    const draw = (node: HTMLElement, width: number, height: number) =>
-      html2canvas(node, { scale: 2, backgroundColor: "#ffffff", useCORS: true, logging: false, scrollX: 0, scrollY: 0, x: 0, y: 0, width, height, windowWidth: width, windowHeight: height });
+    const fallback = (node: HTMLElement, width: number, height: number) =>
+      html2canvas(node, { scale: scaleFor(height), backgroundColor: "#ffffff", useCORS: true, logging: false, scrollX: 0, scrollY: 0, x: 0, y: 0, width, height, windowWidth: width, windowHeight: height });
+    // The browser's own renderer first; html2canvas only if that is not possible (an image that cannot be inlined, or a browser that blocks it).
+    const draw = async (node: HTMLElement, width: number, height: number) => {
+      if (native) {
+        try { return await drawNative(doc, width, height, scaleFor(height)); } catch (error) { native = false; console.warn("PDF: browser drawing failed, using the fallback drawing", error); }
+      }
+      return fallback(node, width, height);
+    };
 
     const shots: Shot[] = [];
     const pages = Array.from(doc.querySelectorAll<HTMLElement>(".pdf-page"));

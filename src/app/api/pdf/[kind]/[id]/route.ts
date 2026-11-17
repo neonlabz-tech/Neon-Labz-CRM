@@ -3,9 +3,12 @@ import { getCurrentUser } from "@/lib/auth";
 import { connectDb } from "@/lib/db";
 import { can, ownerScope, type Role } from "@/lib/permissions";
 import { isId } from "@/lib/project-access";
-import { infoHtml, marketingReportHtml, packageHtml, planHtml, proposalHtml, quotationHtml, receiptHtml, srsHtml, type InfoInput, type MarketingReportInput, type PlanInput } from "@/lib/pdf/documents";
-import { invoiceAssets, letterheadAssets, pdfResponse, renderAndStore } from "@/lib/pdf/store";
+import { infoHtml, packageHtml, planHtml, proposalHtml, quotationHtml, receiptHtml, srsHtml, type InfoInput, type PlanInput } from "@/lib/pdf/documents";
+import { marketingReportHtml, type ReportDocInput } from "@/lib/pdf/marketing-report";
+import { invoiceAssets, letterheadAssets, pdfResponse, quotationAssets, renderAndStore } from "@/lib/pdf/store";
 import { renderPdf } from "@/lib/pdf/render";
+import { buildReport, isReportId, REPORT_TYPES } from "@/lib/company-reports";
+import { companyReportHtml } from "@/lib/pdf/company-report";
 import { open } from "@/lib/secrets";
 import type { R2Folder } from "@/lib/r2";
 import { Client } from "@/models/client";
@@ -41,7 +44,7 @@ const LOADERS: Record<string, Loader> = {
     const lead = await Lead.findOne({ leadId: quote.leadId }).select("address").lean();
     return {
       name: quote.number,
-      html: async () => quotationHtml({ ...quote, address: lead?.address ?? "" }, await invoiceAssets()),
+      html: async () => quotationHtml({ ...quote, address: lead?.address ?? "" }, await quotationAssets()),
       stored: { folder: "quotations", url: quote.pdfUrl, save: (pdfUrl) => Quotation.updateOne({ _id: id }, { pdfUrl }) },
     };
   },
@@ -49,6 +52,8 @@ const LOADERS: Record<string, Loader> = {
     if (user.role !== "superadmin" && user.role !== "sales") return null;
     const receipt = await Invoice.findOne({ _id: id, ...(user.role === "sales" ? { salesOwner: user.username } : {}) }).lean();
     if (!receipt) return null;
+    // Only the Super Admin can open a receipt that is still waiting for approval (to review it).
+    if (receipt.approval !== "approved" && user.role !== "superadmin") return null;
     const quote = await Quotation.findById(receipt.quoteId).select("items terms total").lean();
     const [{ n: paid = 0 } = { n: 0 }] = await Payment.aggregate<{ n: number }>([{ $match: { quoteId: receipt.quoteId, status: "confirmed" } }, { $group: { _id: null, n: { $sum: "$amount" } } }]);
     return {
@@ -81,9 +86,10 @@ const LOADERS: Record<string, Loader> = {
     if (!can(user.role, "marketing.view")) return null;
     const report = await MarketingReport.findById(id).lean();
     if (!report) return null;
+    const client = await Client.findOne({ code: report.clientCode }).select("logo").lean();
     return {
       name: `${report.clientName}-${report.title || "report"}`,
-      html: async () => marketingReportHtml(report as unknown as MarketingReportInput, report.clientCode, await letterheadAssets()),
+      html: async () => marketingReportHtml(JSON.parse(JSON.stringify(report)) as ReportDocInput, await quotationAssets(), client?.logo ?? ""),
       stored: { folder: "reports", url: report.pdfUrl, save: (pdfUrl) => MarketingReport.updateOne({ _id: id }, { pdfUrl }) },
     };
   },
@@ -93,7 +99,7 @@ const LOADERS: Record<string, Loader> = {
     if (!plan) return null;
     return {
       name: plan.title,
-      html: async () => planHtml(plan as unknown as PlanInput, plan.clientName, await letterheadAssets()),
+      html: async () => planHtml(plan as unknown as PlanInput, plan.clientName, await quotationAssets()),
       stored: { folder: "reports", url: plan.pdfUrl, save: (pdfUrl) => MarketingPlan.updateOne({ _id: id }, { pdfUrl }) },
     };
   },
@@ -104,7 +110,7 @@ const LOADERS: Record<string, Loader> = {
     const info = await MarketingInfo.findOne({ clientCode: code }).lean();
     if (!info) return null;
     const social = Object.fromEntries((info.social instanceof Map ? [...info.social.entries()] : Object.entries((info.social ?? {}) as Record<string, unknown>)).map(([key, raw]) => { const value = raw as { password?: string }; return [key, { ...value, password: showPasswords ? open(value.password ?? "") : "" }]; }));
-    return { name: `${info.brandName || info.clientName}-profile`, html: async () => infoHtml({ ...info, social } as unknown as InfoInput, info.clientCode, await letterheadAssets()) };
+    return { name: `${info.brandName || info.clientName}-profile`, html: async () => infoHtml({ ...info, social } as unknown as InfoInput, info.clientCode, await quotationAssets()) };
   },
   /** One receipt of a manual sale. The id is the sale's id, an underscore and the payment's number. */
   async salepay(id, user) {
@@ -122,6 +128,15 @@ const LOADERS: Record<string, Loader> = {
     };
     return { name: pay.receiptNo, html: async () => receiptHtml(receipt, null, await invoiceAssets(), paid) };
   },
+  /** A Super Admin report. The id is `report~from~to`, for example `sales~2026-11-01~2026-11-30`. */
+  async company(id, user) {
+    if (!can(user.role, "reports.company")) return null;
+    const [type = "", from = "", to = ""] = id.split("~");
+    const day = /^\d{4}-\d{2}-\d{2}$/;
+    if (!isReportId(type) || !day.test(from) || !day.test(to)) return null;
+    const title = REPORT_TYPES.find((t) => t.id === type)!.title;
+    return { name: `${title}-${from}-${to}`, html: async () => companyReportHtml(await buildReport(type, from, to), `${from} to ${to}`, await letterheadAssets()) };
+  },
   async package(id, user) {
     if (!can(user.role, "packages.view")) return null;
     const item = await Package.findById(id).lean();
@@ -137,7 +152,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
   if (!user) return NextResponse.json({ message: "Please sign in." }, { status: 401 });
   const { kind, id } = await params;
   const load = LOADERS[kind];
-  if (!load || (kind !== "info" && !isId(kind === "salepay" ? id.split("_")[0] ?? "" : id))) return NextResponse.json({ message: "Document not found." }, { status: 404 });
+  if (!load || (kind !== "info" && kind !== "company" && !isId(kind === "salepay" ? id.split("_")[0] ?? "" : id))) return NextResponse.json({ message: "Document not found." }, { status: 404 });
 
   await connectDb();
   const source = await load(id, user);

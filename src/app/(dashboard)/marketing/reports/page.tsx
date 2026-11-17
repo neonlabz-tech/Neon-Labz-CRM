@@ -10,7 +10,7 @@ import { requireAction } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { PdfLink } from "@/components/ui/pdf-link";
 import { connectDb } from "@/lib/db";
-import { REPORT_PLATFORMS } from "@/lib/marketing";
+import { REPORT_PLATFORMS, platformHasData, type PlatformData } from "@/lib/marketing";
 import { escapeRegex, pageOf, limitOf, skipOf, param, type SearchParams } from "@/lib/pagination";
 import { MarketingReport } from "@/models/marketing-report";
 import { User } from "@/models/user";
@@ -38,7 +38,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     viewOnly ? User.find({ role: "marketing" }).select("username fullName").sort({ username: 1 }).lean() : [],
   ]);
   const used = (r: (typeof rows)[number]) =>
-    REPORT_PLATFORMS.filter(([key]) => Object.entries(r.platforms?.[key] ?? {}).some(([k, v]) => (k === "analysisImages" ? (v as string[]).length > 0 : Boolean(v)))).map(([, label]) => label).join(", ");
+    REPORT_PLATFORMS.filter(([key]) => platformHasData(r.platforms?.[key] as unknown as Partial<PlatformData> | undefined)).map(([, label]) => label).join(", ");
 
   return (
     <>

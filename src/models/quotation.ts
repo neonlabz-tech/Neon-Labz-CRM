@@ -1,7 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 const item = new mongoose.Schema(
-  { packageId: String, packageName: { type: String, required: true }, service: String, period: String, price: { type: Number, required: true }, scope: { type: String, required: true } },
+  { packageId: String, packageName: { type: String, required: true }, service: String, period: String, icon: { type: String, default: "" }, price: { type: Number, required: true }, scope: { type: String, required: true } },
   { _id: false }
 );
 

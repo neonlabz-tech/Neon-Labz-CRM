@@ -15,6 +15,8 @@ import { formatMoney } from "@/lib/money";
 import { escapeRegex, pageOf, limitOf, skipOf, param, type SearchParams } from "@/lib/pagination";
 import { can } from "@/lib/permissions";
 import { CATEGORIES, Package } from "@/models/package";
+import { PackageIconSvg } from "@/components/packages/icon-picker";
+import { resolveIcon } from "@/lib/package-icons";
 
 export const metadata = { title: "Packages" };
 
@@ -34,7 +36,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
 
   await connectDb();
   const [rows, total] = await Promise.all([
-    Package.find(filter).select("name category description price duration features status cover").sort({ createdAt: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
+    Package.find(filter).select("name category description price duration features status cover icon").sort({ createdAt: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
     Package.countDocuments(filter),
   ]);
 
@@ -58,7 +60,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
               header: "Package",
               cell: (r) => (
                 <span className="flex items-center gap-3">
-                  {r.cover ? <Image src={r.cover} alt="" width={48} height={32} className="h-8 w-12 rounded-md object-cover" /> : <span className="h-8 w-12 rounded-md bg-brand-100" />}
+                  {r.cover ? <Image src={r.cover} alt="" width={48} height={32} className="h-8 w-12 rounded-md object-cover" /> : <span className="flex h-8 w-12 items-center justify-center rounded-md bg-brand-100 text-[#873CFF]"><PackageIconSvg id={resolveIcon(r.icon, r.name, r.category)} className="h-4 w-4" /></span>}
                   {r.name}
                 </span>
               ),

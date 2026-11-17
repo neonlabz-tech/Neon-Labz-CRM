@@ -1,11 +1,12 @@
-import { FileField } from "@/components/ui/file-field";
-import Image from "next/image";
+// import { FileField } from "@/components/ui/file-field";
+import { IconField } from "@/components/packages/icon-picker";
+// import Image from "next/image";
 import { Field, SelectField, TextareaField } from "@/components/ui/field";
 import { ActionForm } from "@/components/ui/form";
 import { CATEGORIES, DURATIONS } from "@/models/package";
 import { savePackageAction } from "@/server/package-actions";
 
-export type PackageDefaults = { id?: string; name?: string; category?: string; description?: string; price?: number; duration?: string; features?: string[]; status?: string; cover?: string };
+export type PackageDefaults = { id?: string; name?: string; category?: string; description?: string; price?: number; duration?: string; features?: string[]; status?: string; cover?: string; icon?: string };
 
 export function PackageForm({ defaults = {} }: { defaults?: PackageDefaults }) {
   return (
@@ -21,6 +22,8 @@ export function PackageForm({ defaults = {} }: { defaults?: PackageDefaults }) {
       </SelectField>
       <div className="sm:col-span-2"><TextareaField label="Description" name="description" defaultValue={defaults.description} /></div>
       <div className="sm:col-span-2"><TextareaField label="What is included (one item per line)" name="features" rows={5} defaultValue={defaults.features?.join("\n")} /></div>
+      <div className="sm:col-span-2"><IconField defaultValue={defaults.icon ?? ""} /></div>
+      {/* Cover image is switched off for now: the quotation uses the icon above.
       <div className="space-y-2 sm:col-span-2">
         <FileField label="Cover image" name="cover" accept="image/jpeg,image/png,image/webp" hint="JPG, PNG or WebP · up to 3 MB" maxMb={3} />
         {defaults.cover && (
@@ -30,6 +33,7 @@ export function PackageForm({ defaults = {} }: { defaults?: PackageDefaults }) {
           </div>
         )}
       </div>
+      */}
       <SelectField label="Status" name="status" defaultValue={defaults.status ?? "active"}>
         <option value="active">Active</option>
         <option value="archived">Archived</option>
