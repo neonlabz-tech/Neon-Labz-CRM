@@ -22,9 +22,9 @@ export async function historyProjectCodes(): Promise<string[]> {
 }
 
 /** Record ids of the projects in History, for hiding their tasks from the lists. */
-export async function historyProjectIds() {
+export async function historyProjectIds(): Promise<mongoose.Types.ObjectId[]> {
   await connectDb();
-  return Project.distinct("_id", { archived: true });
+  return (await Project.distinct("_id", { archived: true })) as mongoose.Types.ObjectId[];
 }
 
 /** Client codes whose projects are all in History (the client has at least one project and none is active). Marketing documents of these clients stay out of the lists until a project is moved back to active. */

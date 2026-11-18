@@ -20,7 +20,7 @@ export async function EmployeeDashboard({ username, name, sp }: { username: stri
   await connectDb();
   const time = timeIn(prefix);
   // A task with no start or due date belongs to the month it was created in, so it still shows up on the dashboard.
-  const undated = { startDate: { $in: ["", null] }, dueDate: { $in: ["", null] }, createdAt: time };
+  const undated: object = { startDate: { $in: ["", null] }, dueDate: { $in: ["", null] }, createdAt: time };
   // Tasks of projects in History stay out of the dashboard.
   const tasks = await Task.find({ assigneeCode: username, projectId: { $nin: await historyProjectIds() }, ...(prefix ? { $or: [...(dateIn(prefix, "startDate", "dueDate").$or as object[]), { completedAt: time }, { doneAt: time }, undated] } : {}) })
     .select("title projectId status dueDate completedAt doneAt").limit(500).lean();

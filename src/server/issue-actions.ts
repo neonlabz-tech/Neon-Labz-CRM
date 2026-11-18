@@ -17,7 +17,7 @@ import { Project } from "@/models/project";
 import type { ActionState } from "@/types";
 
 /** The issues a person may change: the Super Admin any; a PM or MD their own, plus the ones the Super Admin sent to their team. */
-function reach(user: { role: string; username: string }, id: string) {
+function reach(user: { role: string; username: string }, id: string): Record<string, unknown> {
   if (user.role === "superadmin") return { _id: id };
   const team = user.role === "pm" ? "pm" : user.role === "marketing" ? "marketing" : "";
   return { _id: id, $or: [{ createdBy: user.username }, ...(team ? [{ audience: { $in: [team, "both"] } }] : [])] };

@@ -58,13 +58,13 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   await connectDb();
   const sellers = user.role === "superadmin" ? await User.find({ role: "sales" }).select("username fullName").sort({ username: 1 }).lean() : [];
   // A lead that is converted or lost no longer needs a follow-up.
-  const open = { status: { $nin: ["Converted", "Lost"] } };
+  const open: Record<string, unknown> = { status: { $nin: ["Converted", "Lost"] } };
   const [rows, total, everyLead, overdueCount, dueToday, converted] = await Promise.all([
     Lead.find(filter).select("leadId business phone email address businessType source service status next notes clientCode owner createdAt date calls").sort({ createdAt: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
     Lead.countDocuments(filter),
     Lead.countDocuments(scope),
-    Lead.countDocuments({ ...scope, ...open, next: { $gt: "", $lt: today } }),
-    Lead.countDocuments({ ...scope, ...open, next: today }),
+    Lead.countDocuments({ ...scope, ...open, next: { $gt: "", $lt: today } } as Record<string, unknown>),
+    Lead.countDocuments({ ...scope, ...open, next: today } as Record<string, unknown>),
     Lead.countDocuments({ ...scope, status: "Converted" }),
   ]);
   const overdue = (r: (typeof rows)[number]) => Boolean(r.next) && r.next < today && r.status !== "Converted" && r.status !== "Lost";

@@ -18,7 +18,7 @@ export default async function ContentTrackerPage({ searchParams }: { searchParam
   const q = param(sp, "q");
   const page = pageOf(sp);
   const rx = q ? new RegExp(escapeRegex(q), "i") : null;
-  const filter = { ...(await visibleProjectFilter(user)), type: { $in: ["marketing", "both"] }, archived: false, ...(rx ? { $or: [{ name: rx }, { code: rx }, { clientName: rx }] } : {}) };
+  const filter: Record<string, unknown> = { ...(await visibleProjectFilter(user)), type: { $in: ["marketing", "both"] }, archived: false, ...(rx ? { $or: [{ name: rx }, { code: rx }, { clientName: rx }] } : {}) };
 
   await connectDb();
   const [rows, total] = await Promise.all([

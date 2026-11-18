@@ -54,7 +54,7 @@ export async function saveLeadAction(_: ActionState, formData: FormData): Promis
   // A new lead can be added without a call; calls are logged afterwards from the follow-up window.
   const logging = !existing && Boolean(input.callOutcome);
   const unanswered = input.callOutcome === "Not Answered";
-  const status = logging ? (unanswered ? existing?.status ?? picked : input.callStatus ?? picked) : picked;
+  const status = logging ? (unanswered ? picked : input.callStatus ?? picked) : picked;
 
   if (status === "Converted" && (!input.address || !digits)) {
     return field("status", "Enter a Sri Lankan phone number and address before marking Converted.");
