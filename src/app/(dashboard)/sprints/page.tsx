@@ -1,6 +1,7 @@
 import { Eye } from "lucide-react";
 import { AccessBar } from "@/components/projects/access-bar";
 import { MeetingForm } from "@/components/projects/meeting-form";
+import { AUDIENCE_SHORT, sentToFilter } from "@/lib/audience";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, PageHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
@@ -33,15 +34,15 @@ export default async function SprintsPage({ searchParams }: { searchParams: Prom
   const own = ownView(user.role, sp);
   const pm = param(sp, "pm");
   const page = pageOf(sp);
-  const manage = can(user.role, "projects.manage") && (user.role !== "superadmin" || own);
+  const manage = can(user.role, "projects.manage");
   const adding = manage && param(sp, "new") === "1";
   const edit = manage ? param(sp, "edit") : "";
   const view = param(sp, "view");
 
   await connectDb();
-  const visible = await Project.find({ $and: [await visibleProjectFilter(user), ...(own ? [{ owner: user.username }] : []), ...(pm ? [accountFilter(pm)] : [])] }).select("code name type").lean();
+  const visible = await Project.find({ $and: [{ archived: false }, await visibleProjectFilter(user), ...(own ? [{ owner: user.username }] : []), ...(pm ? [accountFilter(pm)] : [])] }).select("code name type").lean();
   const projects = new Map(visible.map((p) => [p.code, p]));
-  const filter = { projectCode: { $in: [...projects.keys()] } };
+  const filter = { projectCode: { $in: [...projects.keys()] }, ...sentToFilter(user.role) };
   const [rows, total, { projects: choices }, accounts] = await Promise.all([
     Meeting.find(filter).sort({ createdAt: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
     Meeting.countDocuments(filter),
@@ -59,11 +60,11 @@ export default async function SprintsPage({ searchParams }: { searchParams: Prom
       <PageHeader title="Sprints" subtitle="Each row is a project meeting. Repeating meetings move to the next date after one is marked conducted or cancelled.">
         {manage && <AddLink href={withParam("new=1")}>Schedule meeting</AddLink>}
       </PageHeader>
-      {user.role === "superadmin" && <AccessBar own={own} pm={pm} path="/sprints" accounts={accounts.map((a) => ({ username: a.username, label: a.fullName ? `${a.fullName} (${a.username})` : a.username }))} />}
+      {user.role === "superadmin" && <AccessBar own={own} editable pm={pm} path="/sprints" accounts={accounts.map((a) => ({ username: a.username, label: a.fullName ? `${a.fullName} (${a.username})` : a.username }))} />}
       {(adding || editing) && (
         <Panel title={editing ? "Edit meeting" : "Schedule meeting"} closeHref={base}>
-          <MeetingForm projects={choices} values={editing
-            ? { id: String(editing._id), projectCode: editing.projectCode, startDate: editing.startDate, time: editing.time, link: editing.link, recurrence: editing.recurrence, status: "scheduled", nextDate: formatDay(upcomingMeetings(editing)[0]?.date ?? editing.startDate) }
+          <MeetingForm showAudience={user.role === "superadmin"} projects={choices} values={editing
+            ? { id: String(editing._id), projectCode: editing.projectCode, startDate: editing.startDate, time: editing.time, link: editing.link, recurrence: editing.recurrence, audience: editing.audience, status: "scheduled", nextDate: formatDay(upcomingMeetings(editing)[0]?.date ?? editing.startDate) }
             : { projectCode: "", startDate: "", time: "09:00", link: "", recurrence: "none" }} />
         </Panel>
       )}
@@ -90,6 +91,7 @@ export default async function SprintsPage({ searchParams }: { searchParams: Prom
           columns={[
             { header: "Project", cell: (r) => projects.get(r.projectCode)?.name ?? "Project removed" },
             { header: "Type", cell: (r) => TYPE[projects.get(r.projectCode)?.type as keyof typeof TYPE] ?? "—" },
+            ...(user.role === "superadmin" ? [{ header: "Sent to", cell: (r: (typeof rows)[number]) => (r.audience ? AUDIENCE_SHORT[r.audience as keyof typeof AUDIENCE_SHORT] : "By project") }] : []),
             { header: "Repeats", cell: (r) => RECURRENCES[r.recurrence as keyof typeof RECURRENCES] ?? RECURRENCES.none },
             { header: "Date", cell: (r) => formatDay((upcomingMeetings(r)[0] ?? pastMeetings(r)[0])?.date ?? r.startDate) },
             { header: "Time", cell: (r) => formatClock(r.time) },

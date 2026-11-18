@@ -25,6 +25,8 @@ import { PeriodFilter } from "@/components/finance/period-filter";
 import { CompanyTarget } from "./company-target";
 import { TeamRanking } from "./team-ranking";
 import { companyGoals, periodTarget } from "@/lib/sales-targets";
+import { commissionPayable } from "@/lib/my-sales";
+import { TopPackages } from "./top-packages";
 import { Bars, ChartGrid, Kpis, PALETTE, Panel, Ring, slices, Tabs, toCounts, type Slice } from "./widgets";
 
 type Row = { _id: unknown; n: number };
@@ -52,7 +54,8 @@ export async function AdminDashboard({ username, sp }: { username: string; sp: S
 async function Company({ prefix, note, year, month }: { prefix: string; note: string; year: string; month: string }) {
   const dates = dateIn(prefix, "date");
   const projectMatch = { archived: false, ...dateIn(prefix, "startDate", "dueDate") };
-  const [waiting, salesRevenue, manualRevenue, status, ownCount, people, packages, perDepartment, departments, stages, payroll, expenses, revenues, confirmed, expenseKinds, salary, requests] = await Promise.all([
+  const [history, waiting, salesRevenue, manualRevenue, status, ownCount, people, packages, perDepartment, departments, stages, payroll, expenses, revenues, confirmed, expenseKinds, salary, requests] = await Promise.all([
+    Project.countDocuments({ archived: true }),
     Invoice.find({ approval: "pending" }).select("receiptNo clientName salesOwner amount type date").sort({ createdAt: -1 }).limit(10).lean(),
     Payment.aggregate<Row>(sum("amount", { status: "confirmed", ...dates })),
     Revenue.aggregate<Row>(sum("amount", dates)),
@@ -76,7 +79,7 @@ async function Company({ prefix, note, year, month }: { prefix: string; note: st
   const departmentCounts = toCounts(perDepartment);
   const expenseRows = [...expenseKinds.map((row) => [String(row._id), row.n] as [string, number]), ...(total(salary) ? [["Salary", total(salary)] as [string, number]] : [])];
   const revenueTotal = total(salesRevenue) + total(manualRevenue);
-  const company = await companyGoals();
+  const [company, commission] = await Promise.all([companyGoals(), commissionPayable(prefix)]);
 
   return (
     <>
@@ -85,8 +88,10 @@ async function Company({ prefix, note, year, month }: { prefix: string; note: st
         { label: "Revenue", value: formatMoney(revenueTotal), hint: note },
         { label: "Projects", value: projectTotal },
         { label: "Own projects", value: ownCount },
+        { label: "History projects", value: history, hint: "Moved out of active work" },
         { label: "People", value: people },
         { label: "Packages", value: packages },
+        { label: "Total commission payable", value: formatMoney(commission.payable), hint: `Earned ${formatMoney(commission.earned)} · paid ${formatMoney(commission.paid)}` },
         { label: "Password requests", value: requests, hint: "Waiting for you" },
       ]} />
       <TeamRanking year={year} month={month} prefix={prefix} />
@@ -114,6 +119,7 @@ async function Company({ prefix, note, year, month }: { prefix: string; note: st
       <ChartGrid>
         <Bars title="Finance records" data={named([["Payroll", payroll], ["Expenses", expenses], ["Manual revenue entries", revenues], ["Project payments", confirmed]])} />
         <Bars title="Expenses" data={named(expenseRows)} format="money" />
+        <TopPackages prefix={prefix} />
       </ChartGrid>
     </>
   );

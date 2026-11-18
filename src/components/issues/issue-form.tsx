@@ -1,12 +1,13 @@
 import { Field, SelectField, TextareaField } from "@/components/ui/field";
 import { ActionForm } from "@/components/ui/form";
+import { AUDIENCES } from "@/lib/audience";
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, ISSUE_TYPES } from "@/lib/issues";
 import { saveIssueAction } from "@/server/issue-actions";
 
-export type IssueValues = { id?: string; title: string; projectCode: string; status: string; priority: string; type: string; assignee: string; dueDate: string; description: string; steps: string; expected: string };
+export type IssueValues = { id?: string; title: string; projectCode: string; status: string; priority: string; type: string; assignee: string; dueDate: string; description: string; steps: string; expected: string; audience?: string };
 const labels = (map: Record<string, string>) => Object.entries(map).map(([value, label]) => <option key={value} value={value}>{label}</option>);
 
-export function IssueForm({ values, projects, members }: { values: IssueValues; projects: { code: string; name: string }[]; members: { username: string; name: string }[] }) {
+export function IssueForm({ values, projects, members, showAudience = false }: { values: IssueValues; projects: { code: string; name: string }[]; members: { username: string; name: string }[]; showAudience?: boolean }) {
   return (
     <ActionForm action={saveIssueAction} submit="Save issue" toastOnSuccess={false} className="grid gap-4 sm:grid-cols-2">
       {values.id && <input type="hidden" name="id" value={values.id} />}
@@ -15,6 +16,13 @@ export function IssueForm({ values, projects, members }: { values: IssueValues; 
         <option value="" disabled>Choose a project</option>
         {projects.map((p) => <option key={p.code} value={p.code}>{p.name} ({p.code})</option>)}
       </SelectField>
+      {showAudience && (
+        <div className="sm:col-span-2">
+          <SelectField label="Send to" required name="audience" defaultValue={values.audience || "both"}>
+            {Object.entries(AUDIENCES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </SelectField>
+        </div>
+      )}
       <SelectField label="Type" required name="type" defaultValue={values.type}>{labels(ISSUE_TYPES)}</SelectField>
       <SelectField label="Status" required name="status" defaultValue={values.status}>{labels(ISSUE_STATUSES)}</SelectField>
       <SelectField label="Priority" required name="priority" defaultValue={values.priority}>{labels(ISSUE_PRIORITIES)}</SelectField>

@@ -64,7 +64,7 @@ const LOADERS: Record<string, Loader> = {
   },
   async srs(id, user) {
     if (!can(user.role, "reports.manage")) return null;
-    const srs = await Srs.findOne({ _id: id, owner: user.username }).lean();
+    const srs = await Srs.findOne(user.role === "superadmin" ? { _id: id } : { _id: id, owner: user.username }).lean();
     if (!srs) return null;
     return {
       name: srs.title,
@@ -74,7 +74,7 @@ const LOADERS: Record<string, Loader> = {
   },
   async proposal(id, user) {
     if (!can(user.role, "reports.manage")) return null;
-    const proposal = await Proposal.findOne({ _id: id, owner: user.username }).lean();
+    const proposal = await Proposal.findOne(user.role === "superadmin" ? { _id: id } : { _id: id, owner: user.username }).lean();
     if (!proposal) return null;
     return {
       name: proposal.title,

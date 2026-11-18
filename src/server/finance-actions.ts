@@ -7,6 +7,7 @@ import { requireAction } from "@/lib/auth";
 import { connectDb } from "@/lib/db";
 import { DEFAULT_CATEGORIES } from "@/lib/finance";
 import { done, fail, invalid } from "@/lib/form";
+import { commissionEarned, commissionPaid } from "@/lib/my-sales";
 import { isId } from "@/lib/project-access";
 import { categorySchema, expenseSchema, payrollSchema, revenueSchema } from "@/schemas/finance";
 import { Expense, ExpenseCategory, Payroll, Revenue } from "@/models/finance";
@@ -28,10 +29,10 @@ export async function savePayrollAction(_: ActionState, formData: FormData): Pro
     return field("date", "This employee already has a payroll record for that month. Edit that one instead.");
   }
   if (id) {
-    const result = isId(id) ? await Payroll.updateOne({ _id: id }, { ...data, month }) : { matchedCount: 0 };
+    const result = isId(id) ? await Payroll.updateOne({ _id: id }, { ...data, month, commissionMonth: data.commissionMonth || month }) : { matchedCount: 0 };
     if (!result.matchedCount) return fail("That payment was not found.");
   } else {
-    await Payroll.create({ ...data, month });
+    await Payroll.create({ ...data, month, commissionMonth: data.commissionMonth || month });
   }
   await writeAudit(admin.username, id ? "finance.payroll.updated" : "finance.payroll.created", { month });
   revalidatePath("/finance", "layout");
@@ -107,4 +108,16 @@ export async function deleteRevenueAction(id: string): Promise<ActionState> {
   await writeAudit(admin.username, "finance.revenue.deleted", { id });
   revalidatePath("/finance", "layout");
   return done("Revenue deleted.");
+}
+
+/** What a salesperson has earned in a month and what payroll already paid, so the payroll form can fill in the balance still due. */
+export async function earnedCommissionAction(username: string, month: string): Promise<{ applies: boolean; earned: number; paid: number; due: number; rate: number; sales: number }> {
+  await requireAction("finance.view");
+  const login = String(username ?? "").toUpperCase();
+  if (!/^SD_\d{3}$/.test(login) || !/^\d{4}-\d{2}$/.test(String(month ?? ""))) return { applies: false, earned: 0, paid: 0, due: 0, rate: 0, sales: 0 };
+  await connectDb();
+  const got = (await commissionEarned([login], month)).get(login);
+  const earned = got?.earned ?? 0;
+  const { paid } = await commissionPaid(login, String(month));
+  return { applies: true, earned, paid, due: Math.max(0, Math.round((earned - paid) * 100) / 100), rate: got?.rate ?? 0, sales: got?.sales ?? 0 };
 }

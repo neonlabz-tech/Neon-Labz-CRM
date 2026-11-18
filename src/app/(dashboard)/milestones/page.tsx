@@ -1,11 +1,14 @@
 import { AccessBar } from "@/components/projects/access-bar";
+import { MilestoneAddForm } from "@/components/projects/milestone-add-form";
 import { MilestonesBoard } from "@/components/projects/milestones-board";
 import { DialogButton } from "@/components/ui/dialog-button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, PageHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Pagination, SearchBar } from "@/components/ui/list-controls";
+import { AddLink, Panel } from "@/components/ui/panel";
 import { requireAction } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { connectDb } from "@/lib/db";
 import { keepOwn, ownView } from "@/lib/own";
 import { escapeRegex, pageOf, limitOf, skipOf, param, type SearchParams } from "@/lib/pagination";
@@ -34,7 +37,7 @@ export default async function MilestonesPage({ searchParams }: { searchParams: P
 
   await connectDb();
   const [projects, accounts] = await Promise.all([
-    Project.find({ $and: [await visibleProjectFilter(user), ...(own ? [{ owner: user.username }] : []), ...(pm ? [accountFilter(pm)] : [])] }).select("code name clientName type status startDate dueDate description").lean(),
+    Project.find({ $and: [{ archived: false }, await visibleProjectFilter(user), ...(own ? [{ owner: user.username }] : []), ...(pm ? [accountFilter(pm)] : [])] }).select("code name clientName type status startDate dueDate description").lean(),
     admin && !own ? User.find({ role: { $in: ["pm", "marketing"] } }).select("username fullName").sort({ username: 1 }).lean() : [],
   ]);
   const byId = new Map(projects.map((p) => [String(p._id), p]));
@@ -93,16 +96,29 @@ export default async function MilestonesPage({ searchParams }: { searchParams: P
   // The Assigned filter lists the people of the part the signed-in person runs; the Super Admin sees everyone.
   const assignable = employees.filter((e) => admin || (user.role === "marketing" ? marketingSet.has(e.username) : !marketingSet.has(e.username)));
   const keep = { ...keepOwn(own), ...(pm ? { pm } : {}) };
+  // Add a milestone from here. The Super Admin chooses which team it goes to; a project manager or marketing head adds to their own part.
+  const canAdd = can(user.role, "projects.manage");
+  const adding = canAdd && param(sp, "new") === "1";
+  const query = new URLSearchParams(keep).toString();
+  const base = `/milestones${query ? `?${query}` : ""}`;
+  const addable = adding ? await Project.find({ archived: false, ...(await visibleProjectFilter(user)) }).select("code name type").sort({ name: 1 }).limit(300).lean() : [];
 
   return (
     <>
-      <PageHeader title="Milestones" subtitle="Every milestone across your projects. Click a project or milestone to see its tasks and drag them between statuses." />
-      {admin && <AccessBar own={own} pm={pm} path="/milestones" accounts={accounts.map((a) => ({ username: a.username, label: a.fullName ? `${a.fullName} (${a.username})` : a.username }))} />}
+      <PageHeader title="Milestones" subtitle="Every milestone across your projects. Click a project or milestone to see its tasks and drag them between statuses.">
+        {canAdd && <AddLink href={`/milestones?${new URLSearchParams({ ...keep, new: "1" }).toString()}`}>Add milestone</AddLink>}
+      </PageHeader>
+      {adding && (
+        <Panel title="Add milestone" subtitle={admin ? "Choose the project and who it goes to." : "Choose the project."} closeHref={base}>
+          <MilestoneAddForm projects={addable.map((p) => ({ code: p.code, name: p.name, type: p.type as ProjectType }))} employees={admin ? mixed : user.role === "marketing" ? marketing : software} admin={admin} department={user.role === "marketing" ? "marketing" : "software"} />
+        </Panel>
+      )}
+      {admin && <AccessBar own={own} editable pm={pm} path="/milestones" accounts={accounts.map((a) => ({ username: a.username, label: a.fullName ? `${a.fullName} (${a.username})` : a.username }))} />}
       <SearchBar q={q} keep={keep} placeholder="Search by milestone or project" filters={[
         { name: "status", label: "All statuses", value: status, options: Object.entries(MILESTONE_STATUS).map(([value, label]) => ({ value, label })) },
         { name: "assigned", label: "All assigned", value: assigned, options: assignable.map((e) => ({ value: e.username, label: e.label })) },
       ]} />
-      {rows.length === 0 ? <EmptyState title="No milestones yet" text="Milestones are added inside each project." /> : (
+      {rows.length === 0 ? <EmptyState title="No milestones yet" text={canAdd ? "Use Add milestone to create one." : "Milestones are added inside each project."} /> : (
         <DataTable
           rows={rows}
           rowKey={(r) => String(r._id)}

@@ -11,6 +11,7 @@ export const payrollSchema = z.object({
   employee: z.string().min(1, "Choose an employee."),
   base: money("base amount"),
   commission: money("commission"),
+  commissionMonth: z.string().regex(/^(\d{4}-\d{2})?$/, "Choose the commission month.").default(""),
   date: dayOf("Pay date is required."),
   status: z.enum(PAY_STATUSES, "Choose a status."),
 });

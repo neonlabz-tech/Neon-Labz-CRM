@@ -11,6 +11,8 @@ const schema = new mongoose.Schema(
     /** Status of each date of the series, keyed YYYY-MM-DD. A date with no entry is still scheduled. */
     statusByDate: { type: mongoose.Schema.Types.Mixed, default: {} },
     createdBy: { type: String, required: true },
+    /** Set by the Super Admin: which team the meeting goes to. Blank means it follows the project, as before. */
+    audience: { type: String, enum: ["", "pm", "marketing", "both"], default: "" },
   },
   { timestamps: true, minimize: false }
 );

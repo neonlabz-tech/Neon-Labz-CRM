@@ -1,4 +1,5 @@
 import { Field, SelectField } from "@/components/ui/field";
+import { LogoField } from "@/components/clients/contacts-form";
 import { ActionForm } from "@/components/ui/form";
 import { INFO_FIELDS, SOCIALS, SOCIAL_LABEL } from "@/lib/marketing";
 import { saveInfoAction } from "@/server/marketing-actions";
@@ -8,9 +9,11 @@ type InfoValues = Record<string, string>;
 type Props = {
   clients: { code: string; name: string }[]; clientCode: string; lockClient: boolean;
   values: InfoValues; social: Record<string, { username: string; pageLink: string; hasPassword: boolean }>;
+  /** The client's current logo, when there is one. */
+  logo?: string;
 };
 
-export function InfoForm({ clients, clientCode, lockClient, values, social }: Props) {
+export function InfoForm({ clients, clientCode, lockClient, values, social, logo = "" }: Props) {
   return (
     <ActionForm action={saveInfoAction} submit="Save client info" toastOnSuccess={false} className="space-y-6">
       {lockClient ? (
@@ -26,6 +29,10 @@ export function InfoForm({ clients, clientCode, lockClient, values, social }: Pr
       )}
       <div className="grid gap-4 sm:grid-cols-2">
         {INFO_FIELDS.map(([key, label]) => <Field key={key} label={label} required={key === "brandName" || key === "mainContactName"} name={key} defaultValue={values[key]} type={key === "email" ? "email" : "text"} />)}
+      </div>
+      <div>
+        <LogoField logo={logo} name={clients.find((c) => c.code === clientCode)?.name ?? "Client"} />
+        <p className="mt-1 text-xs text-muted">Optional. The logo is saved on the client, so it also shows on the Clients page and in the marketing report.</p>
       </div>
       <div>
         <h2 className="mb-1 font-semibold">Social accounts</h2>

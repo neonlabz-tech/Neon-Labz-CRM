@@ -4,14 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { BadgeCheck, Briefcase, CalendarRange, ClipboardList, Activity, Bug, ChartColumn, Gauge, HandCoins, UsersRound, FolderKanban, ListChecks, ChevronsLeft, FileText, LayoutDashboard, LogOut, Menu, Package, PhoneCall, Search, ShieldCheck, UserCog, UserRound, Wallet, X } from "lucide-react";
+import { BadgeCheck, Bell, Briefcase, CalendarRange, ClipboardList, Activity, Bug, ChartColumn, Gauge, HandCoins, UsersRound, FolderKanban, ListChecks, ChevronsLeft, FileText, LayoutDashboard, LogOut, Menu, Package, PhoneCall, Search, ShieldCheck, UserCog, UserRound, Wallet, X } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { logoutAction } from "@/server/auth-actions";
 import type { IconName, NavGroup } from "@/lib/nav";
 
 const ICONS = {
   dashboard: LayoutDashboard, users: UserCog, audit: ShieldCheck, account: UserRound, leads: PhoneCall, quotes: FileText,
-  search: Search, payments: Wallet, approvals: BadgeCheck, clients: Briefcase, packages: Package, projects: FolderKanban, work: ListChecks, info: ClipboardList, hrms: UsersRound, issues: Bug, reports: FileText, mreports: ChartColumn, productivity: Gauge, activity: Activity, finance: HandCoins, plans: CalendarRange,
+  search: Search, payments: Wallet, approvals: BadgeCheck, clients: Briefcase, packages: Package, projects: FolderKanban, work: ListChecks, info: ClipboardList, hrms: UsersRound, issues: Bug, reports: FileText, mreports: ChartColumn, productivity: Gauge, activity: Activity, finance: HandCoins, plans: CalendarRange, notifications: Bell,
 } satisfies Record<IconName, typeof LayoutDashboard>;
 
 type Props = { groups: NavGroup[]; name: string; roleLabel: string; collapsedByDefault: boolean; bell: React.ReactNode };

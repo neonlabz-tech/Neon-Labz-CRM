@@ -43,17 +43,17 @@ export function MilestonesBoard({ projectCode, type, role, username, milestones,
             startDate: t.startDate ?? "", dueDate: t.dueDate ?? "", description: richToHtml(t.description ?? ""), status: t.status,
           }));
           return (
-            <Card key={id}>
+            <Card key={id} className="border-transparent bg-gradient-to-b from-[#1c2142] via-[#4b1fa8] to-[#1c2142] text-white">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="font-semibold">{m.title}</h3>
-                  <p className="text-xs text-muted">{m.department === "marketing" ? "Marketing" : "Software"}{m.startDate ? ` · ${m.startDate}` : ""}{m.dueDate ? ` → ${m.dueDate}` : ""}{m.assignees.length ? ` · ${m.assignees.join(", ")}` : ""}</p>
+                  <h3 className="font-semibold text-white">{m.title}</h3>
+                  <p className="text-xs text-white/70">{m.department === "marketing" ? "Marketing" : "Software"}{m.startDate ? ` · ${m.startDate}` : ""}{m.dueDate ? ` → ${m.dueDate}` : ""}{m.assignees.length ? ` · ${m.assignees.join(", ")}` : ""}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge tone={finished ? "success" : m.status === "at-risk" ? "danger" : "info"}>{MILESTONE_STATUS[m.status as keyof typeof MILESTONE_STATUS]}</Badge>
                   {manager && (
                     <DialogButton label="Edit milestone" title="Edit milestone" subtitle={`${projectCode} · ${m.title}`} icon={<Pencil className="h-4 w-4" />}>
-                      <MilestoneForm projectCode={projectCode} type={type} allowed={lanes} employees={poolFor(m.department as Department)} milestone={{ id, title: m.title, startDate: m.startDate ?? "", dueDate: m.dueDate ?? "", department: m.department as Department, assignees: m.assignees }} />
+                      <MilestoneForm admin={role === "superadmin"} projectCode={projectCode} type={type} allowed={lanes} employees={poolFor(m.department as Department)} milestone={{ id, title: m.title, startDate: m.startDate ?? "", dueDate: m.dueDate ?? "", department: m.department as Department, assignees: m.assignees }} />
                     </DialogButton>
                   )}
                   {manager && <MilestoneDelete code={projectCode} id={id} title={m.title} />}
@@ -73,8 +73,8 @@ export function MilestonesBoard({ projectCode, type, role, username, milestones,
               {canAdd && (
                 <InlineForms>
                   <details className="mt-4">
-                    <summary className="cursor-pointer text-sm font-semibold text-brand-700">Add a task</summary>
-                    <div className="mt-3"><TaskForm projectCode={projectCode} milestoneId={id} employees={poolFor(m.department as Department)} manager={manager} /></div>
+                    <summary className="cursor-pointer text-sm font-semibold text-brand-200 hover:text-white">Add a task</summary>
+                    <div className="mt-3 rounded-xl bg-white p-4 text-ink"><TaskForm projectCode={projectCode} milestoneId={id} employees={poolFor(m.department as Department)} manager={manager} /></div>
                   </details>
                 </InlineForms>
               )}
@@ -85,7 +85,7 @@ export function MilestonesBoard({ projectCode, type, role, username, milestones,
         {lanes.length > 0 && !isEmployee && (
           <Card>
             <h3 className="mb-3 font-semibold">Add a milestone</h3>
-            <InlineForms><MilestoneForm projectCode={projectCode} type={type} allowed={lanes} employees={lanes.length > 1 ? mixed : poolFor(lanes[0] ?? "software")} /></InlineForms>
+            <InlineForms><MilestoneForm admin={role === "superadmin"} projectCode={projectCode} type={type} allowed={lanes} employees={lanes.length > 1 ? mixed : poolFor(lanes[0] ?? "software")} /></InlineForms>
           </Card>
         )}
       </div>

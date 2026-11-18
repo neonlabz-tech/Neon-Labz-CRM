@@ -51,7 +51,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ code: 
         <div className="flex items-center gap-2">
           <Badge tone={shownStatus === "completed" ? "success" : shownStatus === "on-hold" ? "warning" : "info"}>{PROJECT_STATUS[shownStatus as keyof typeof PROJECT_STATUS]}</Badge>
           {user.role === "superadmin" && partsLine(project) && <span className="text-xs text-muted">{partsLine(project)}</span>}
-          {project.archived && <Badge tone="warning">Archived</Badge>}
+          {project.archived && <Badge tone="warning">In history</Badge>}
           {editShell && <ArchiveProject code={project.code} archived={project.archived} />}
         </div>
       </PageHeader>

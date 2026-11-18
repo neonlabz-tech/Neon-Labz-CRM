@@ -4,14 +4,13 @@ import { InfoRowActions } from "@/components/marketing/row-actions";
 import { EmptyState, PageHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Pagination, SearchBar } from "@/components/ui/list-controls";
-import { AccessBar } from "@/components/projects/access-bar";
 import { keepOwn, ownView } from "@/lib/own";
 import { requireAction } from "@/lib/auth";
 import { connectDb } from "@/lib/db";
+import { historyClientCodes } from "@/lib/project-access";
 import { escapeRegex, pageOf, limitOf, skipOf, param, type SearchParams } from "@/lib/pagination";
 import { formatDateTime } from "@/lib/utils";
 import { MarketingInfo } from "@/models/marketing-info";
-import { User } from "@/models/user";
 
 export const metadata = { title: "Client info" };
 
@@ -21,9 +20,7 @@ export default async function InfoListPage({ searchParams }: { searchParams: Pro
   const q = param(sp, "q");
   const page = pageOf(sp);
   const own = ownView(user.role, sp);
-  const admin = user.role === "superadmin";
-  const viewOnly = admin && !own;
-  // Project managers can read the info document (without saved passwords) but cannot add, edit or delete it.
+  // Project managers can read the info document (without saved passwords) but cannot add, edit or delete it. The Super Admin can do everything.
   const glance = user.role === "pm";
   const md = param(sp, "md");
   const keep = { ...keepOwn(own), ...(md ? { md } : {}) };
@@ -31,17 +28,17 @@ export default async function InfoListPage({ searchParams }: { searchParams: Pro
   const filter = { ...(rx ? { $or: [{ clientName: rx }, { clientCode: rx }, { brandName: rx }] } : {}), ...(own ? { createdBy: user.username } : md ? { createdBy: md } : {}) };
 
   await connectDb();
-  const [rows, total, accounts] = await Promise.all([
-    MarketingInfo.find(filter).select("clientCode clientName brandName industry updatedAt").sort({ updatedAt: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
-    MarketingInfo.countDocuments(filter),
-    viewOnly ? User.find({ role: "marketing" }).select("username fullName").sort({ username: 1 }).lean() : [],
+  const hidden = await historyClientCodes();
+  const shown = { ...filter, clientCode: { $nin: hidden } };
+  const [rows, total] = await Promise.all([
+    MarketingInfo.find(shown).select("clientCode clientName brandName industry updatedAt").sort({ updatedAt: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
+    MarketingInfo.countDocuments(shown)
   ]);
 
   return (
     <>
-      {admin && <AccessBar own={own} pm={md} name="md" noun="marketing" path="/marketing/info" accounts={accounts.map((a) => ({ username: a.username, label: a.fullName || a.username }))} />}
       <PageHeader title="Client info" subtitle="Brand details and social accounts for each client.">
-        {!viewOnly && !glance && <Link prefetch={false} href={own ? "/marketing/info/new?own=1" : "/marketing/info/new"} className="brand-gradient inline-flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Add client info</Link>}
+        {!glance && <Link prefetch={false} href={own ? "/marketing/info/new?own=1" : "/marketing/info/new"} className="brand-gradient inline-flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Add client info</Link>}
       </PageHeader>
       <SearchBar q={q} keep={keep} placeholder="Search by client, code or brand" />
       {rows.length === 0 ? <EmptyState title="No client info yet" text="Add the brand details once a client is ready for marketing." /> : (
@@ -53,7 +50,7 @@ export default async function InfoListPage({ searchParams }: { searchParams: Pro
             { header: "Brand", cell: (r) => r.brandName || "—" },
             { header: "Industry", cell: (r) => r.industry || "—" },
             { header: "Updated", cell: (r) => formatDateTime(r.updatedAt) },
-            { header: "Actions", cell: (r) => <InfoRowActions clientCode={r.clientCode} readOnly={viewOnly || glance} /> },
+            { header: "Actions", cell: (r) => <InfoRowActions clientCode={r.clientCode} readOnly={glance} /> },
           ]}
         />
       )}

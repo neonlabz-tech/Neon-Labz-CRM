@@ -2,13 +2,12 @@ import { ProposalForm, type ProposalValues } from "@/components/reports/proposal
 import { ReportTable } from "@/components/reports/report-table";
 import { Pagination, SearchBar } from "@/components/ui/list-controls";
 import { AddLink, Panel } from "@/components/ui/panel";
-import { ReportsTop } from "@/components/projects/reports-top";
 import { requireAction } from "@/lib/auth";
 import { reportScope } from "@/lib/report-scope";
 import { todayISO } from "@/lib/dates";
 import { connectDb } from "@/lib/db";
 import { escapeRegex, pageOf, limitOf, skipOf, param, type SearchParams } from "@/lib/pagination";
-import { isId } from "@/lib/project-access";
+import { isId, historyProjectCodes } from "@/lib/project-access";
 import { reportProjects } from "@/lib/report-page";
 import { deleteProposalAction } from "@/server/report-actions";
 import { Proposal } from "@/models/report";
@@ -25,14 +24,15 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
   const scope = reportScope(user, sp);
   const edit = scope.readOnly ? "" : param(sp, "edit");
   const adding = !scope.readOnly && param(sp, "new") === "1";
-  const filter = { ...scope.owner, ...(q ? { title: new RegExp(escapeRegex(q), "i") } : {}) };
+  // Reports of a project that is in History stay hidden until the project is moved back to active.
+  const filter = { ...scope.owner, projectCode: { $nin: await historyProjectCodes() }, ...(q ? { title: new RegExp(escapeRegex(q), "i") } : {}) };
 
   const { projects, names } = await reportProjects(user);
   await connectDb();
   const [rows, total, editing] = await Promise.all([
     Proposal.find(filter).select("title projectCode date").sort({ createdAt: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
     Proposal.countDocuments(filter),
-    isId(edit) ? Proposal.findOne({ _id: edit, owner: user.username }).lean() : null,
+    isId(edit) ? Proposal.findOne(user.role === "superadmin" ? { _id: edit } : { _id: edit, owner: user.username }).lean() : null,
   ]);
 
   // The editor works with plain text values and four row lists.
@@ -49,7 +49,6 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      {user.role === "superadmin" && <ReportsTop own={scope.own} pm={scope.pm} />}
       {!scope.readOnly && <div className="mb-4 flex justify-end"><AddLink href="?new=1">Add proposal</AddLink></div>}
       {(adding || editing) && (
         <Panel title={editing ? "Edit proposal" : "Add proposal"} closeHref="/reports/proposals">

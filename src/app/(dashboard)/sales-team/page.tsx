@@ -79,10 +79,17 @@ export default async function SalesTeamPage({ searchParams }: { searchParams: Pr
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-brand-50" aria-hidden="true"><div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, percent)}%` }} /></div>
                 <dl className="mt-4 grid grid-cols-3 gap-2 text-xs">
                   <div><dt className="text-muted">Period target</dt><dd className="font-semibold">{formatMoney(target)}</dd></div>
-                  <div><dt className="text-muted">Commission</dt><dd className="font-semibold">{goals.rate}%</dd></div>
+                  <div><dt className="text-muted">Commission rate</dt><dd className="font-semibold">{goals.rate}%</dd></div>
                   <div><dt className="text-muted">Leads</dt><dd className="font-semibold">{count.get(user.username) ?? 0}</dd></div>
                 </dl>
-                <Link prefetch={false} href={`?edit=${user.username}&year=${year || "all"}&month=${month || "all"}`} className="mt-4 inline-flex h-10 items-center rounded-xl border border-line px-4 text-sm font-semibold text-brand-700 hover:bg-brand-50">Manage targets & rate</Link>
+                <dl className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-brand-50/60 p-3 text-xs">
+                  <div><dt className="text-muted">Commission earned</dt><dd className="text-sm font-bold text-success">{formatMoney((got * goals.rate) / 100)}</dd></div>
+                  <div><dt className="text-muted">Full commission at target</dt><dd className="text-sm font-bold">{target ? formatMoney((target * goals.rate) / 100) : "—"}</dd></div>
+                </dl>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link prefetch={false} href={`?edit=${user.username}&year=${year || "all"}&month=${month || "all"}`} className="inline-flex h-10 items-center rounded-xl border border-line px-4 text-sm font-semibold text-brand-700 hover:bg-brand-50">Manage targets & rate</Link>
+                  <Link prefetch={false} href={`/my-targets?seller=${user.username}`} className="inline-flex h-10 items-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white">Targets & history</Link>
+                </div>
               </article>
             );
           }))}

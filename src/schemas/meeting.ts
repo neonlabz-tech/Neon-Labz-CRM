@@ -9,5 +9,6 @@ export const meetingSchema = z.object({
   time: z.string().regex(/^\d{2}:\d{2}$/, "Choose a time."),
   link: z.string().trim().min(1, "Add the meeting link.").max(300),
   recurrence: z.enum(Object.keys(RECURRENCES) as [keyof typeof RECURRENCES]),
+  audience: z.enum(["", "pm", "marketing", "both"]).default(""),
   status: z.enum(Object.keys(MEETING_STATUS) as [keyof typeof MEETING_STATUS]).default("scheduled"),
 });

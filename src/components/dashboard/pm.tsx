@@ -4,7 +4,7 @@ import { dateIn, group, periodNote, timeIn } from "@/lib/dashboard";
 import { todayISO } from "@/lib/dates";
 import { MONTHS, readPeriod } from "@/lib/finance";
 import { ISSUE_PRIORITIES } from "@/lib/issues";
-import { visibleProjectFilter } from "@/lib/project-access";
+import { historyProjectCodes, visibleProjectFilter } from "@/lib/project-access";
 import { PRIORITY, PROJECT_STATUS, statusFor } from "@/lib/projects";
 import type { SearchParams } from "@/lib/pagination";
 import { Client } from "@/models/client";
@@ -20,8 +20,10 @@ export async function PmDashboard({ username, sp }: { username: string; sp: Sear
   await connectDb();
   const projectMatch = { ...(await visibleProjectFilter({ role: "pm", username })), archived: false, ...dateIn(prefix, "startDate", "dueDate") };
   const taskTime = timeIn(prefix);
-  const issueMatch = { createdBy: username, ...dateIn(prefix, "reportedAt", "dueDate") };
-  const mine = { owner: username, ...dateIn(prefix, "date") };
+  // Issues and reports of projects in History stay out of these numbers.
+  const hidden = { projectCode: { $nin: await historyProjectCodes() } };
+  const issueMatch = { createdBy: username, ...hidden, ...dateIn(prefix, "reportedAt", "dueDate") };
+  const mine = { owner: username, ...hidden, ...dateIn(prefix, "date") };
   const ids = await Project.find(projectMatch).select("_id type status softwareStatus marketingStatus").lean();
   // The software part decides what counts as completed here.
   const status: Record<string, number> = {};

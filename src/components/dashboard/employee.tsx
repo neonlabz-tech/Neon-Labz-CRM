@@ -5,6 +5,7 @@ import { addDays, todayISO } from "@/lib/dates";
 import { MONTHS, readPeriod } from "@/lib/finance";
 import type { SearchParams } from "@/lib/pagination";
 import { TASK_STATUS } from "@/lib/projects";
+import { historyProjectIds } from "@/lib/project-access";
 import { Project } from "@/models/project";
 import { Task } from "@/models/task";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +19,10 @@ export async function EmployeeDashboard({ username, name, sp }: { username: stri
   const { year, month, prefix } = readPeriod(sp, today);
   await connectDb();
   const time = timeIn(prefix);
-  const tasks = await Task.find({ assigneeCode: username, ...(prefix ? { $or: [...(dateIn(prefix, "startDate", "dueDate").$or as object[]), { completedAt: time }, { doneAt: time }] } : {}) })
+  // A task with no start or due date belongs to the month it was created in, so it still shows up on the dashboard.
+  const undated = { startDate: { $in: ["", null] }, dueDate: { $in: ["", null] }, createdAt: time };
+  // Tasks of projects in History stay out of the dashboard.
+  const tasks = await Task.find({ assigneeCode: username, projectId: { $nin: await historyProjectIds() }, ...(prefix ? { $or: [...(dateIn(prefix, "startDate", "dueDate").$or as object[]), { completedAt: time }, { doneAt: time }, undated] } : {}) })
     .select("title projectId status dueDate completedAt doneAt").limit(500).lean();
   const projects = await Project.find({ _id: { $in: [...new Set(tasks.map((t) => String(t.projectId)))] } }).select("name owner").lean();
   const projectName = new Map(projects.map((p) => [String(p._id), p.name]));

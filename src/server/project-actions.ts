@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { audienceFitMessage, audienceFits } from "@/lib/audience";
 import { requireAction } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { connectDb } from "@/lib/db";
@@ -11,7 +12,7 @@ import { done, fail, invalid } from "@/lib/form";
 import { workTypeOfClient } from "@/lib/work-type";
 import { notifyRole, notifyUsers, notifyWork } from "@/lib/notify";
 import { findProject, isId, marketingUsernames, syncProjectStatus, validEmployeeCodes } from "@/lib/project-access";
-import { canEditProjectShell, canManageDepartment, defaultDepartment, type ProjectType } from "@/lib/projects";
+import { canEditProjectShell, canManageDepartment, defaultDepartment, type Department, type ProjectType } from "@/lib/projects";
 import { milestoneSchema, projectSchema, projectUpdateSchema } from "@/schemas/project";
 import { Client } from "@/models/client";
 import { Milestone } from "@/models/milestone";
@@ -77,7 +78,7 @@ export async function archiveProjectAction(code: string, archived: boolean): Pro
   await writeAudit(user.username, archived ? "project.archived" : "project.restored", { code });
   revalidatePath("/projects");
   revalidatePath(`/projects/${code}`);
-  return done(archived ? "Project archived." : "Project restored.");
+  return done(archived ? "Project moved to history." : "Project moved back to active.");
 }
 
 export async function setTeamAction(code: string, lane: "software" | "marketing", usernames: string[]): Promise<ActionState> {
@@ -102,38 +103,62 @@ export async function saveMilestoneAction(_: ActionState, formData: FormData): P
   const raw = { ...Object.fromEntries(formData), assignees: formData.getAll("assignees") };
   const parsed = milestoneSchema.safeParse(raw);
   if (!parsed.success) return invalid(parsed.error);
-  const { projectCode: code, id, ...data } = parsed.data;
+  const { projectCode: code, id, audience: sent, ...data } = parsed.data;
 
   const project = await findProject(user, code);
   if (!project) return fail("Project not found.");
-  const department = project.type === "both" ? data.department : defaultDepartment(project.type as ProjectType);
-  if (!canManageDepartment(user.role, project.type, department)) return fail("You cannot manage milestones in this part of the project.");
-  const assignees = await validEmployeeCodes(data.assignees);
+  const type = project.type as ProjectType;
+  // The Super Admin adding a milestone picks the team: Project Manager (software), Marketing (MD) or both (one milestone for each).
+  const audience = user.role === "superadmin" && !id && sent ? sent : "";
+  if (audience && !audienceFits(type, audience)) return fail(audienceFitMessage(type));
+  const departments: Department[] =
+    audience === "both" ? (type === "both" ? ["software", "marketing"] : [defaultDepartment(type)])
+    : audience === "pm" ? ["software"]
+    : audience === "marketing" ? ["marketing"]
+    : [type === "both" ? data.department : defaultDepartment(type)];
+  for (const department of departments) {
+    if (!canManageDepartment(user.role, type, department)) return fail("You cannot manage milestones in this part of the project.");
+  }
+
+  const all = await validEmployeeCodes(data.assignees);
   const marketingSet = await marketingUsernames();
-  if (assignees.some((a) => marketingSet.has(a) !== (department === "marketing"))) {
-    return fail(department === "marketing" ? "Choose employees from the marketing team only." : "Choose employees from the software team only.");
+  const teamOf = (department: Department) => all.filter((a) => marketingSet.has(a) === (department === "marketing"));
+  // With both teams the people picked are split between the two milestones; otherwise they must all belong to the one team.
+  if (departments.length === 1 && all.some((a) => marketingSet.has(a) !== (departments[0] === "marketing"))) {
+    return fail(departments[0] === "marketing" ? "Choose employees from the marketing team only." : "Choose employees from the software team only.");
   }
 
   const existing = id && isId(id) ? await Milestone.findOne({ _id: id, projectId: project._id }) : null;
   if (id && !existing) return fail("Milestone not found.");
-  if (!assignees.length) return fail("Assign at least one employee to this milestone.");
-  if (department === "marketing") {
-    if (data.startDate && !dateIsAllowed(data.startDate, existing?.startDate ?? "")) return fail("Start date cannot be before today.");
-    if (!dateIsAllowed(data.dueDate, existing?.dueDate ?? "")) return fail("Due date cannot be before today.");
+  for (const department of departments) {
+    if (!teamOf(department).length) {
+      return fail(departments.length > 1 ? `Choose at least one ${department === "marketing" ? "marketing" : "software"} employee, because this goes to both teams.` : "Assign at least one employee to this milestone.");
+    }
+    if (department === "marketing") {
+      if (data.startDate && !dateIsAllowed(data.startDate, existing?.startDate ?? "")) return fail("Start date cannot be before today.");
+      if (!dateIsAllowed(data.dueDate, existing?.dueDate ?? "")) return fail("Due date cannot be before today.");
+    }
   }
-  if (existing) Object.assign(existing, { ...data, department, assignees });
-  else await Milestone.create({ ...data, department, assignees, projectId: project._id });
-  if (existing) await existing.save();
 
-  // Anyone named on a milestone joins that part of the team.
-  const lane = department === "marketing" ? "marketingAssignees" : "assignees";
-  project[lane] = [...new Set([...project[lane], ...assignees])];
+  for (const department of departments) {
+    const assignees = teamOf(department);
+    if (existing) {
+      Object.assign(existing, { ...data, department, assignees });
+      await existing.save();
+    } else {
+      await Milestone.create({ ...data, department, assignees, projectId: project._id });
+    }
+    // Anyone named on a milestone joins that part of the team.
+    const lane = department === "marketing" ? "marketingAssignees" : "assignees";
+    project[lane] = [...new Set([...project[lane], ...assignees])];
+  }
   await project.save();
   await syncProjectStatus(project._id);
 
   revalidatePath("/projects");
+  revalidatePath("/milestones");
   revalidatePath(`/projects/${code}`);
-  return done(existing ? "Milestone saved." : "Milestone added.");
+  return done(existing ? "Milestone saved." : departments.length > 1 ? "Milestone added for both teams." : "Milestone added.");
 }
 
 export async function deleteMilestoneAction(code: string, id: string): Promise<ActionState> {

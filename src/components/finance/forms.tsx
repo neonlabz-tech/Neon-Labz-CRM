@@ -1,14 +1,17 @@
 import { Field, SelectField, TextareaField } from "@/components/ui/field";
 import { ActionForm } from "@/components/ui/form";
+import { AutoCommission } from "@/components/finance/auto-commission";
 import { PAY_STATUSES } from "@/lib/finance";
 import { addCategoryAction, saveExpenseAction, savePayrollAction, saveRevenueAction } from "@/server/finance-actions";
 
 const Hidden = ({ id }: { id?: string }) => (id ? <input type="hidden" name="id" value={id} /> : null);
 const grid = "grid gap-4 sm:grid-cols-2";
 
-export function PayrollForm({ values, employees }: {
-  values: { id?: string; employee: string; base: string; commission: string; date: string; status: string };
+export function PayrollForm({ values, employees, logins }: {
+  values: { id?: string; employee: string; base: string; commission: string; commissionMonth: string; date: string; status: string };
   employees: { id: string; label: string; group: string }[];
+  /** Employee id to login, so a salesperson's earned commission can be filled in. */
+  logins: Record<string, string>;
 }) {
   const groups = [...new Set(employees.map((e) => e.group))];
   return (
@@ -24,7 +27,8 @@ export function PayrollForm({ values, employees }: {
       </SelectField>
       <Field label="Pay date" required name="date" type="date" defaultValue={values.date} />
       <Field label="Base amount (LKR)" required name="base" type="number" min="0" step="0.01" defaultValue={values.base} />
-      <Field label="Commission (LKR)" required name="commission" type="number" min="0" step="0.01" defaultValue={values.commission} />
+      <Field label="Commission month" name="commissionMonth" type="month" defaultValue={values.commissionMonth} />
+      <AutoCommission logins={logins} defaultValue={values.commission} />
       <SelectField label="Status" required name="status" defaultValue={values.status}>{PAY_STATUSES.map((s) => <option key={s}>{s}</option>)}</SelectField>
     </ActionForm>
   );

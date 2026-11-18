@@ -8,7 +8,7 @@ import { AddLink, Panel } from "@/components/ui/panel";
 import { RowActions } from "@/components/ui/row-actions";
 import { connectDb } from "@/lib/db";
 import { todayISO } from "@/lib/dates";
-import { periodRegex, PAY_STATUSES, readPeriod } from "@/lib/finance";
+import { monthLabel, periodRegex, PAY_STATUSES, readPeriod } from "@/lib/finance";
 import { formatMoney } from "@/lib/money";
 import { escapeRegex, pageOf, limitOf, skipOf, param, type SearchParams } from "@/lib/pagination";
 import { isId } from "@/lib/project-access";
@@ -16,6 +16,12 @@ import { Payroll } from "@/models/finance";
 import { Department, Employee } from "@/models/hrms";
 
 export const metadata = { title: "Finance · Payroll" };
+
+const previousMonth = (today: string) => {
+  const d = new Date(`${today.slice(0, 7)}-01T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() - 1);
+  return d.toISOString().slice(0, 7);
+};
 
 export default async function PayrollPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
@@ -40,7 +46,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   }
 
   const [rows, total, editing] = await Promise.all([
-    Payroll.find(filter).select("employee date base commission status").sort({ date: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
+    Payroll.find(filter).select("employee date month commissionMonth base commission status").sort({ date: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
     Payroll.countDocuments(filter),
     isId(edit) ? Payroll.findById(edit).lean() : null,
   ]);
@@ -53,7 +59,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       <div className="mb-4 flex justify-end"><AddLink href="?new=1">Add payment</AddLink></div>
       {(adding || editing) && (
         <Panel title={editing ? "Edit payment" : "Add payment"} closeHref="/finance/payroll">
-          <PayrollForm employees={options} values={editing ? { id: String(editing._id), employee: String(editing.employee), base: String(editing.base), commission: String(editing.commission), date: editing.date, status: editing.status } : { employee: "", base: "", commission: "0", date: todayISO(), status: "Non-paid" }} />
+          <PayrollForm employees={options} logins={Object.fromEntries(people.map((p) => [String(p._id), p.username]))} values={editing ? { id: String(editing._id), employee: String(editing.employee), base: String(editing.base), commission: String(editing.commission), commissionMonth: editing.commissionMonth || editing.month, date: editing.date, status: editing.status } : { employee: "", base: "", commission: "0", commissionMonth: previousMonth(todayISO()), date: todayISO(), status: "Non-paid" }} />
         </Panel>
       )}
       <PeriodFilter basePath="/finance/payroll" year={year} month={month} q={q} searchLabel="Employee name or login" extras={[
@@ -70,6 +76,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
             { header: "Commission", cell: (r) => formatMoney(r.commission) },
             { header: "Total", cell: (r) => formatMoney(r.base + r.commission) },
             { header: "Pay date", cell: (r) => r.date },
+            { header: "Commission for", cell: (r) => monthLabel(r.commissionMonth || r.month) },
             { header: "Status", cell: (r) => <Badge tone={r.status === "Paid" ? "success" : "warning"}>{r.status}</Badge> },
             { header: "Actions", cell: (r) => <RowActions id={String(r._id)} editHref={`?edit=${r._id}`} /> },
           ]}

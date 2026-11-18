@@ -23,8 +23,12 @@ export async function saveInfoAction(_: ActionState, formData: FormData): Promis
   const parsed = infoSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return invalid(parsed.error);
   await connectDb();
-  const client = await Client.findOne({ code: parsed.data.clientCode }).select("name").lean();
+  const client = await Client.findOne({ code: parsed.data.clientCode }).select("name logo").lean();
   if (!client) return fail("Choose a client.");
+  // The logo is optional and belongs to the client, so it shows everywhere the client's logo does. A new file replaces it; the box removes it.
+  const upload = await uploadFile(formData.get("logo"), "logos", { images: true, maxMb: 2, what: "logo" });
+  if (upload.error) return { ok: false, message: upload.error, errors: { logo: upload.error } };
+  const logoChange = upload.url ? { logo: upload.url } : formData.get("removeLogo") === "on" ? { logo: "" } : null;
 
   const existing = await MarketingInfo.findOne({ clientCode: parsed.data.clientCode });
   const social: Record<string, { username: string; password: string; pageLink: string }> = {};
@@ -43,9 +47,14 @@ export async function saveInfoAction(_: ActionState, formData: FormData): Promis
   } else {
     await MarketingInfo.create({ ...data, createdBy: user.username });
   }
+  if (logoChange) {
+    await Client.updateOne({ code: parsed.data.clientCode }, logoChange);
+    if (client.logo) await deleteFromR2(client.logo);
+    revalidatePath("/clients");
+  }
   await writeAudit(user.username, existing ? "marketing.info.updated" : "marketing.info.created", { client: parsed.data.clientCode });
   revalidatePath("/marketing/info");
-  redirect(user.role === "superadmin" ? "/marketing/info?own=1" : "/marketing/info");
+  redirect("/marketing/info");
 }
 
 export async function deleteInfoAction(clientCode: string): Promise<ActionState> {
@@ -79,7 +88,7 @@ export async function savePlanAction(_: ActionState, formData: FormData): Promis
   }
   await writeAudit(user.username, existing ? "marketing.plan.updated" : "marketing.plan.created", { client: data.clientCode });
   revalidatePath("/marketing/plans");
-  redirect(user.role === "superadmin" ? "/marketing/plans?own=1" : "/marketing/plans");
+  redirect("/marketing/plans");
 }
 
 export async function deletePlanAction(id: string): Promise<ActionState> {
@@ -178,7 +187,7 @@ export async function saveReportAction(_: ActionState, formData: FormData): Prom
   await Promise.all([...removed, ...(oldPdf ? [oldPdf] : [])].map(deleteFromR2));
   await writeAudit(user.username, existing ? "marketing.report.updated" : "marketing.report.created", { client: data.clientCode });
   revalidatePath("/marketing/reports");
-  redirect(user.role === "superadmin" ? "/marketing/reports?own=1" : "/marketing/reports");
+  redirect("/marketing/reports");
 }
 
 export async function deleteReportAction(id: string): Promise<ActionState> {

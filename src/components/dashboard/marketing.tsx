@@ -3,7 +3,7 @@ import { connectDb } from "@/lib/db";
 import { dateIn, periodNote, timeIn } from "@/lib/dashboard";
 import { todayISO } from "@/lib/dates";
 import { MONTHS, readPeriod } from "@/lib/finance";
-import { visibleProjectFilter } from "@/lib/project-access";
+import { historyClientCodes, historyProjectCodes, visibleProjectFilter } from "@/lib/project-access";
 import { PROJECT_STATUS, statusFor } from "@/lib/projects";
 import type { SearchParams } from "@/lib/pagination";
 import { Issue } from "@/models/issue";
@@ -17,14 +17,16 @@ import { Bars, ChartGrid, Hero, Kpis, Ring, slices } from "./widgets";
 export async function MarketingDashboard({ username, sp }: { username: string; sp: SearchParams }) {
   const { year, month, prefix } = readPeriod(sp, todayISO());
   await connectDb();
-  const projectMatch = { ...(await visibleProjectFilter({ role: "marketing", username })), ...dateIn(prefix, "startDate", "dueDate") };
-  const range = dateIn(prefix, "startDate", "endDate");
+  const projectMatch = { ...(await visibleProjectFilter({ role: "marketing", username })), archived: false, ...dateIn(prefix, "startDate", "dueDate") };
+  // Projects in History (and clients whose projects are all in History) stay out of these numbers.
+  const [hiddenClients, hiddenProjects] = await Promise.all([historyClientCodes(), historyProjectCodes()]);
+  const range = { ...dateIn(prefix, "startDate", "endDate"), clientCode: { $nin: hiddenClients } };
   const [ids, docs, plans, reports, issues] = await Promise.all([
     Project.find(projectMatch).select("_id type status softwareStatus marketingStatus").lean(),
-    MarketingInfo.countDocuments(),
+    MarketingInfo.countDocuments({ clientCode: { $nin: hiddenClients } }),
     MarketingPlan.countDocuments(range),
     MarketingReport.countDocuments(range),
-    Issue.countDocuments({ createdBy: username, ...dateIn(prefix, "reportedAt", "dueDate") }),
+    Issue.countDocuments({ createdBy: username, projectCode: { $nin: hiddenProjects }, ...dateIn(prefix, "reportedAt", "dueDate") }),
   ]);
   // The marketing part decides what counts as completed here.
   const byStatus: Record<string, number> = {};

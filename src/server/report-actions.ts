@@ -23,16 +23,21 @@ const KINDS: Record<Kind, { path: string; label: string }> = {
 
 type Data = { projectCode: string } & Record<string, unknown>;
 type Ops = {
-  pdf: (id: string, owner: string) => Promise<{ pdfUrl?: string } | null>;
-  update: (id: string, owner: string, data: Data) => Promise<{ matchedCount: number }>;
+  pdf: (id: string, owner: string | null) => Promise<{ pdfUrl?: string } | null>;
+  update: (id: string, owner: string | null, data: Data) => Promise<{ matchedCount: number }>;
   create: (owner: string, data: Data) => Promise<unknown>;
-  remove: (id: string, owner: string) => Promise<{ deletedCount: number }>;
+  remove: (id: string, owner: string | null) => Promise<{ deletedCount: number }>;
 };
+/** A project manager reaches only their own reports; the Super Admin (owner null) reaches everyone's. */
+const ownedBy = (id: string, owner: string | null) => (owner ? { _id: id, owner } : { _id: id });
+
 const OPS: Record<Kind, Ops> = {
-  srs: { pdf: (id, owner) => Srs.findOne({ _id: id, owner }).select("pdfUrl").lean(), update: (id, owner, d) => Srs.updateOne({ _id: id, owner }, d), create: (owner, d) => Srs.create({ ...d, owner }), remove: (id, owner) => Srs.deleteOne({ _id: id, owner }) },
-  proposal: { pdf: (id, owner) => Proposal.findOne({ _id: id, owner }).select("pdfUrl").lean(), update: (id, owner, d) => Proposal.updateOne({ _id: id, owner }, d), create: (owner, d) => Proposal.create({ ...d, owner }), remove: (id, owner) => Proposal.deleteOne({ _id: id, owner }) },
-  video: { pdf: (id, owner) => DemoVideo.findOne({ _id: id, owner }).select("pdfUrl").lean(), update: (id, owner, d) => DemoVideo.updateOne({ _id: id, owner }, d), create: (owner, d) => DemoVideo.create({ ...d, owner }), remove: (id, owner) => DemoVideo.deleteOne({ _id: id, owner }) },
+  srs: { pdf: (id, owner) => Srs.findOne(ownedBy(id, owner)).select("pdfUrl").lean(), update: (id, owner, d) => Srs.updateOne(ownedBy(id, owner), d), create: (owner, d) => Srs.create({ ...d, owner }), remove: (id, owner) => Srs.deleteOne(ownedBy(id, owner)) },
+  proposal: { pdf: (id, owner) => Proposal.findOne(ownedBy(id, owner)).select("pdfUrl").lean(), update: (id, owner, d) => Proposal.updateOne(ownedBy(id, owner), d), create: (owner, d) => Proposal.create({ ...d, owner }), remove: (id, owner) => Proposal.deleteOne(ownedBy(id, owner)) },
+  video: { pdf: (id, owner) => DemoVideo.findOne(ownedBy(id, owner)).select("pdfUrl").lean(), update: (id, owner, d) => DemoVideo.updateOne(ownedBy(id, owner), d), create: (owner, d) => DemoVideo.create({ ...d, owner }), remove: (id, owner) => DemoVideo.deleteOne(ownedBy(id, owner)) },
 };
+
+const scopeOf = (user: { role: string; username: string }) => (user.role === "superadmin" ? null : user.username);
 
 async function save(kind: Kind, schema: ZodType<Data & { id?: string }>, formData: FormData): Promise<ActionState> {
   const user = await requireAction("reports.manage");
@@ -44,8 +49,8 @@ async function save(kind: Kind, schema: ZodType<Data & { id?: string }>, formDat
     return { ok: false, message: "Choose a project from the list.", errors: { projectCode: "Choose a project from the list." } };
   }
   if (id) {
-    const old = isId(id) ? await OPS[kind].pdf(id, user.username) : null;
-    const result = isId(id) ? await OPS[kind].update(id, user.username, { ...data, pdfUrl: "" }) : { matchedCount: 0 };
+    const old = isId(id) ? await OPS[kind].pdf(id, scopeOf(user)) : null;
+    const result = isId(id) ? await OPS[kind].update(id, scopeOf(user), { ...data, pdfUrl: "" }) : { matchedCount: 0 };
     if (!result.matchedCount) return fail(`That ${KINDS[kind].label.toLowerCase()} was not found.`);
     if (old?.pdfUrl) await deleteFromR2(old.pdfUrl);
   } else {
@@ -59,8 +64,8 @@ async function save(kind: Kind, schema: ZodType<Data & { id?: string }>, formDat
 async function remove(kind: Kind, id: string): Promise<ActionState> {
   const user = await requireAction("reports.manage");
   await connectDb();
-  const old = isId(id) ? await OPS[kind].pdf(id, user.username) : null;
-  const result = isId(id) ? await OPS[kind].remove(id, user.username) : { deletedCount: 0 };
+  const old = isId(id) ? await OPS[kind].pdf(id, scopeOf(user)) : null;
+  const result = isId(id) ? await OPS[kind].remove(id, scopeOf(user)) : { deletedCount: 0 };
   if (!result.deletedCount) return fail(`That ${KINDS[kind].label.toLowerCase()} was not found.`);
   if (old?.pdfUrl) await deleteFromR2(old.pdfUrl);
   await writeAudit(user.username, `report.${kind}.deleted`, { id });

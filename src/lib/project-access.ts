@@ -15,6 +15,28 @@ export function isId(value: unknown): value is string {
   return typeof value === "string" && isValidObjectId(value);
 }
 
+/** Codes of the projects that are in History. Their sprints, milestones, issues and reports stay out of the lists until the project is moved back to active. */
+export async function historyProjectCodes(): Promise<string[]> {
+  await connectDb();
+  return Project.distinct("code", { archived: true });
+}
+
+/** Record ids of the projects in History, for hiding their tasks from the lists. */
+export async function historyProjectIds() {
+  await connectDb();
+  return Project.distinct("_id", { archived: true });
+}
+
+/** Client codes whose projects are all in History (the client has at least one project and none is active). Marketing documents of these clients stay out of the lists until a project is moved back to active. */
+export async function historyClientCodes(): Promise<string[]> {
+  await connectDb();
+  const rows = await Project.aggregate<{ _id: string }>([
+    { $group: { _id: "$clientCode", active: { $max: { $cond: [{ $ne: ["$archived", true] }, 1, 0] } } } },
+    { $match: { active: 0 } },
+  ]);
+  return rows.map((r) => r._id).filter(Boolean);
+}
+
 /** Which projects a person may see. Employees only see work they are assigned to. */
 export async function visibleProjectFilter(user: Pick<SessionUser, "role" | "username">): Promise<Record<string, unknown>> {
   switch (user.role) {
