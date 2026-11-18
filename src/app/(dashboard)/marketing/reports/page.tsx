@@ -4,16 +4,15 @@ import { ReportRowActions } from "@/components/marketing/row-actions";
 import { EmptyState, PageHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Pagination, SearchBar } from "@/components/ui/list-controls";
-import { AccessBar } from "@/components/projects/access-bar";
 import { keepOwn, ownView } from "@/lib/own";
 import { requireAction } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { PdfLink } from "@/components/ui/pdf-link";
 import { connectDb } from "@/lib/db";
+import { historyClientCodes } from "@/lib/project-access";
 import { REPORT_PLATFORMS, platformHasData, type PlatformData } from "@/lib/marketing";
 import { escapeRegex, pageOf, limitOf, skipOf, param, type SearchParams } from "@/lib/pagination";
 import { MarketingReport } from "@/models/marketing-report";
-import { User } from "@/models/user";
 
 export const metadata = { title: "Marketing reports" };
 
@@ -23,26 +22,24 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const q = param(sp, "q");
   const page = pageOf(sp);
   const own = ownView(user.role, sp);
-  const admin = user.role === "superadmin";
-  const viewOnly = admin && !own;
   const md = param(sp, "md");
   const keep = { ...keepOwn(own), ...(md ? { md } : {}) };
-  const manage = can(user.role, "marketing.manage") && !viewOnly;
+  const manage = can(user.role, "marketing.manage");
   const rx = q ? new RegExp(escapeRegex(q), "i") : null;
   const filter = { ...(rx ? { $or: [{ clientName: rx }, { clientCode: rx }, { title: rx }] } : {}), ...(own ? { createdBy: user.username } : md ? { createdBy: md } : {}) };
 
   await connectDb();
-  const [rows, total, accounts] = await Promise.all([
-    MarketingReport.find(filter).select("clientCode clientName title startDate endDate platforms").sort({ createdAt: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
-    MarketingReport.countDocuments(filter),
-    viewOnly ? User.find({ role: "marketing" }).select("username fullName").sort({ username: 1 }).lean() : [],
+  const hidden = await historyClientCodes();
+  const shown = { ...filter, clientCode: { $nin: hidden } };
+  const [rows, total] = await Promise.all([
+    MarketingReport.find(shown).select("clientCode clientName title startDate endDate platforms").sort({ createdAt: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
+    MarketingReport.countDocuments(shown)
   ]);
   const used = (r: (typeof rows)[number]) =>
     REPORT_PLATFORMS.filter(([key]) => platformHasData(r.platforms?.[key] as unknown as Partial<PlatformData> | undefined)).map(([, label]) => label).join(", ");
 
   return (
     <>
-      {admin && <AccessBar own={own} pm={md} name="md" noun="marketing" path="/marketing/reports" accounts={accounts.map((a) => ({ username: a.username, label: a.fullName || a.username }))} />}
       <PageHeader title="Marketing reports" subtitle="Monthly social media results for each client.">
         {manage && (
           <Link prefetch={false} href="/marketing/reports/new" className="brand-gradient inline-flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Create report</Link>

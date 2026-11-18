@@ -16,4 +16,5 @@ export const issueSchema = z.object({
   description: long,
   steps: long,
   expected: long,
+  audience: z.enum(["", "pm", "marketing", "both"]).default(""),
 });

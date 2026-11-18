@@ -27,7 +27,7 @@ export function TaskCard({ projectCode, milestoneId, task, manager, mine, locked
     <article
       draggable={canMove && !pending}
       onDragStart={(event) => { event.dataTransfer.setData("application/x-neon-task", JSON.stringify({ id: task.id, status: task.status })); event.dataTransfer.effectAllowed = "move"; }}
-      className={`rounded-xl border border-line bg-white p-3 text-sm shadow-sm ${canMove ? "cursor-grab active:cursor-grabbing" : ""}`}
+      className={`rounded-xl border border-line bg-white p-3 text-sm text-ink shadow-sm ${canMove ? "cursor-grab active:cursor-grabbing" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="font-semibold">{task.title}</p>
@@ -47,7 +47,7 @@ export function TaskCard({ projectCode, milestoneId, task, manager, mine, locked
             {options.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
         ) : <Badge tone="success">{TASK_STATUS[task.status as TaskStatus]}</Badge>}
-        {(manager || (mine && !locked && task.status !== "done")) && (
+        {manager && (
           <DialogButton label="Edit task" title="Edit task" subtitle={`${task.code} · ${task.title}`} icon={<Pencil className="h-4 w-4" />}>
             <TaskForm projectCode={projectCode} milestoneId={milestoneId} task={task} employees={employees} manager={manager} />
           </DialogButton>

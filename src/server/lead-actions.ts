@@ -12,7 +12,7 @@ import { done, fail, invalid } from "@/lib/form";
 import { notifyUsers } from "@/lib/notify";
 import { ownerScope } from "@/lib/permissions";
 import { EMAIL_ERROR, PHONE_ERROR, PHONE_TAKEN, formatPhone, phoneDigits, validEmail, validSriLankanPhone } from "@/lib/phone";
-import { leadSchema } from "@/schemas/lead";
+import { callEntrySchema, leadSchema } from "@/schemas/lead";
 import { Lead } from "@/models/lead";
 import { Payment } from "@/models/payment";
 import { Quotation } from "@/models/quotation";
@@ -35,22 +35,26 @@ export async function saveLeadAction(_: ActionState, formData: FormData): Promis
     await writeAudit(user.username, "permission.denied", { action: "lead.edit", lead: input.id });
     return fail("Lead not found.");
   }
-  if (!dateIsAllowed(input.date, existing?.date ?? "")) return field("date", "Lead date cannot be before today.");
+  // The lead date is always the day the lead was added; nobody can change it.
+  const leadDate = existing?.date || todayISO();
 
   const phone = formatPhone(input.phone);
   const digits = phoneDigits(phone);
-  if (digits && !validSriLankanPhone(phone)) return field("phone", PHONE_ERROR);
+  if (!digits) return field("phone", "Phone is required.");
+  if (!validSriLankanPhone(phone)) return field("phone", PHONE_ERROR);
   if (digits.length === 10 && digits !== existing?.phoneDigits && (await Lead.exists({ phoneDigits: digits, leadId: { $ne: existing?.leadId ?? "" } }))) {
     return field("phone", PHONE_TAKEN);
   }
-  if (input.email && !validEmail(input.email)) return field("email", EMAIL_ERROR);
+  if (!input.email) return field("email", "Email is required.");
+  if (!validEmail(input.email)) return field("email", EMAIL_ERROR);
 
   const picked = existing ? input.status ?? existing.status : "New";
   if (input.callNext && !dateIsAllowed(input.callNext)) return field("callNext", "Next follow-up date cannot be before today.");
 
-  const logging = Boolean(input.callOutcome);
+  // A new lead can be added without a call; calls are logged afterwards from the follow-up window.
+  const logging = !existing && Boolean(input.callOutcome);
   const unanswered = input.callOutcome === "Not Answered";
-  const status = logging ? (unanswered ? existing?.status ?? picked : input.callStatus ?? picked) : picked;
+  const status = logging ? (unanswered ? picked : input.callStatus ?? picked) : picked;
 
   if (status === "Converted" && (!input.address || !digits)) {
     return field("status", "Enter a Sri Lankan phone number and address before marking Converted.");
@@ -65,7 +69,7 @@ export async function saveLeadAction(_: ActionState, formData: FormData): Promis
     : null;
 
   const base = {
-    date: input.date, business: input.business, phone, phoneDigits: digits, email: input.email, address: input.address,
+    date: leadDate, business: input.business, phone, phoneDigits: digits, email: input.email, address: input.address,
     businessType: input.businessType, source: input.source, service: input.service, notes: input.notes, status,
     next: call?.next || existing?.next || "",
     ...(call ? { latestFollowUpAt: new Date() } : {}),
@@ -88,6 +92,11 @@ export async function saveLeadAction(_: ActionState, formData: FormData): Promis
   // A quotation made before conversion carries the client code and name once they exist.
   if (existing) await Quotation.updateOne({ leadId: existing.leadId }, { client: input.business, ...(code ? { clientCode: code } : {}) });
   revalidatePath("/leads");
+  // Editing happens in a window (or on the lead page) and stays where it is; only a new lead goes back to the list.
+  if (existing) {
+    revalidatePath(`/leads/${existing.leadId}`);
+    return done("Lead saved.");
+  }
   redirect(user.role === "superadmin" ? "/leads?own=1" : "/leads");
 }
 
@@ -201,4 +210,98 @@ export async function deleteLeadsAction(ids: string[]): Promise<ActionState> {
   revalidatePath("/leads");
   if (!removable.length) return fail("None of these leads can be deleted. They already have a quotation or payment.");
   return done(`Deleted ${removable.length} lead${removable.length === 1 ? "" : "s"}.${locked.size ? ` ${locked.size} kept because they have a quotation or payment.` : ""}`);
+}
+
+/** Live check while a phone number is typed: is it already on another lead? */
+export async function phoneTakenAction(phone: string, leadId: string): Promise<{ taken: boolean; message: string }> {
+  await requireAction("leads.manage");
+  const digits = phoneDigits(String(phone ?? ""));
+  if (digits.length !== 10) return { taken: false, message: "" };
+  await connectDb();
+  const other = await Lead.findOne({ phoneDigits: digits, leadId: { $ne: String(leadId ?? "") } }).select("leadId").lean();
+  if (!other) return { taken: false, message: "" };
+  return { taken: true, message: "This phone number is already added as another lead." };
+}
+
+type StageLead = { leadId: string; status: string; address: string; phoneDigits: string; clientCode: string };
+
+/** Checks a stage change and works out the client code that goes with it. */
+async function stageChange(lead: StageLead, status: string): Promise<{ error: string } | { code: string }> {
+  if (status === lead.status) return { code: lead.clientCode };
+  if (status === "Converted" && (!lead.address || !lead.phoneDigits)) return { error: "Enter a Sri Lankan phone number and address before marking Converted." };
+  if (lead.clientCode && status !== "Converted") {
+    const used = (await Quotation.exists({ leadId: lead.leadId })) || (await Payment.exists({ leadId: lead.leadId }));
+    if (used) return { error: "This client already has a quotation or payment, so it must stay Converted." };
+  }
+  return { code: status === "Converted" ? lead.clientCode || clientCode(await nextSeq("client")) : "" };
+}
+
+function readCall(formData: FormData) {
+  const raw = Object.fromEntries(formData);
+  for (const key of ["callStatus", "callOutcome"]) if (raw[key] === "") delete raw[key];
+  return callEntrySchema.safeParse(raw);
+}
+
+function refreshLead(id: string) {
+  revalidatePath(`/leads/${id}`);
+  revalidatePath("/leads");
+  revalidatePath("/dashboard");
+}
+
+/** Adds one more call to a lead. A call that was not answered counts as a follow-up and leaves the stage as it is. */
+export async function addCallAction(_: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireAction("leads.manage");
+  const parsed = readCall(formData);
+  if (!parsed.success) return invalid(parsed.error);
+  const input = parsed.data;
+  await connectDb();
+  const lead = await Lead.findOne({ leadId: input.leadId, ...ownerScope(user) });
+  if (!lead) return fail("Lead not found.");
+  if (input.callNext && !dateIsAllowed(input.callNext)) return field("callNext", "Next follow-up date cannot be before today.");
+  const status = input.callOutcome === "Not Answered" ? lead.status : input.callStatus ?? lead.status;
+  const moved = await stageChange(lead, status);
+  if ("error" in moved) return field("callStatus", moved.error);
+  lead.status = status as typeof lead.status;
+  lead.clientCode = moved.code;
+  lead.calls.push({ date: todayISO(), outcome: input.callOutcome, status: status as typeof lead.status, next: input.callNext, note: input.callNote, createdAt: new Date() });
+  if (input.callNext) lead.next = input.callNext;
+  lead.latestFollowUpAt = new Date();
+  await lead.save();
+  if (moved.code) await Quotation.updateOne({ leadId: lead.leadId }, { client: lead.business, clientCode: moved.code });
+  await writeAudit(user.username, "lead.call.added", { lead: lead.leadId, outcome: input.callOutcome });
+  refreshLead(lead.leadId);
+  return done("Call logged.");
+}
+
+/** Edits one entry of the call history. Only the latest entry can change the stage. */
+export async function updateCallAction(_: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireAction("leads.manage");
+  const parsed = readCall(formData);
+  if (!parsed.success) return invalid(parsed.error);
+  const input = parsed.data;
+  await connectDb();
+  const lead = await Lead.findOne({ leadId: input.leadId, ...ownerScope(user) });
+  const entry = lead && input.index !== undefined ? lead.calls[input.index] : undefined;
+  if (!lead || !entry || input.index === undefined) return fail("Call not found.");
+  if (input.callNext && !dateIsAllowed(input.callNext, entry.next ?? "")) return field("callNext", "Next follow-up date cannot be before today.");
+  const latest = input.index === lead.calls.length - 1;
+  const restage = latest && input.callOutcome === "Answered";
+  const status = restage ? input.callStatus ?? entry.status : entry.status;
+  if (restage) {
+    const moved = await stageChange(lead, status);
+    if ("error" in moved) return field("callStatus", moved.error);
+    lead.status = status as typeof lead.status;
+    lead.clientCode = moved.code;
+    if (moved.code) await Quotation.updateOne({ leadId: lead.leadId }, { client: lead.business, clientCode: moved.code });
+  }
+  if (latest) lead.next = input.callNext;
+  entry.outcome = input.callOutcome;
+  entry.status = status as typeof entry.status;
+  entry.next = input.callNext;
+  entry.note = input.callNote;
+  lead.markModified("calls");
+  await lead.save();
+  await writeAudit(user.username, "lead.call.edited", { lead: lead.leadId, index: input.index });
+  refreshLead(lead.leadId);
+  return done("Call updated.");
 }

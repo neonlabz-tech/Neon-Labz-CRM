@@ -5,6 +5,8 @@ const payroll = new mongoose.Schema(
   {
     employee: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", required: true },
     month: { type: String, required: true, match: /^\d{4}-\d{2}$/ },
+    /** The month the commission was earned in, which may differ from the pay month. Older records have none and use the pay month. */
+    commissionMonth: { type: String, default: "", match: /^(\d{4}-\d{2})?$/ },
     date: { type: String, required: true, index: true },
     base: { type: Number, required: true, min: 0 },
     commission: { type: Number, required: true, min: 0 },

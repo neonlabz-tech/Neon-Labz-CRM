@@ -36,6 +36,9 @@ export function validateControl(el: Control, form: HTMLFormElement): string {
   const raw = el.value;
   const value = raw.trim();
 
+  // A field can carry a message from a live server check (for example a phone number that is already taken).
+  if (value && el instanceof HTMLInputElement && el.dataset.taken) return el.dataset.taken;
+
   if (el instanceof HTMLInputElement && el.type === "checkbox") return el.required && !el.checked ? `${label} is required.` : "";
   if (el instanceof HTMLInputElement && el.type === "radio") return "";
   if (!value) {

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { requireAction } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import { connectDb } from "@/lib/db";
-import { visibleProjectFilter } from "@/lib/project-access";
+import { historyProjectIds, visibleProjectFilter } from "@/lib/project-access";
 import { escapeRegex, param, type SearchParams } from "@/lib/pagination";
 import { PRIORITY, TASK_STATUS } from "@/lib/projects";
 import { Project } from "@/models/project";
@@ -22,15 +22,18 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
   const statusFilter = param(sp, "status");
   const priorityFilter = param(sp, "priority");
   await connectDb();
+  // Tasks of projects in History stay out of the lists and the counts.
+  const inHistory = { projectId: { $nin: await historyProjectIds() } };
   const [projects, tasks, totals] = await Promise.all([
     Project.find(await visibleProjectFilter(user)).select("code name clientName dueDate").sort({ createdAt: -1 }).limit(50).lean(),
     Task.find({
       assigneeCode: user.username,
+      ...inHistory,
       ...(q && { title: { $regex: escapeRegex(q), $options: "i" } }),
       ...(statusFilter in TASK_STATUS && { status: statusFilter }),
       ...(priorityFilter in PRIORITY && { priority: priorityFilter }),
     }).select("code title status dueDate priority projectId").sort({ createdAt: -1 }).limit(200).lean(),
-    Task.aggregate<{ _id: string; n: number }>([{ $match: { assigneeCode: user.username } }, { $group: { _id: "$status", n: { $sum: 1 } } }]),
+    Task.aggregate<{ _id: string; n: number }>([{ $match: { assigneeCode: user.username, ...inHistory } }, { $group: { _id: "$status", n: { $sum: 1 } } }]),
   ]);
   const shown = projectFilter ? tasks.filter((t) => String(t.projectId) === projectFilter) : tasks;
   const count = (status: string) => totals.find((t) => t._id === status)?.n ?? 0;

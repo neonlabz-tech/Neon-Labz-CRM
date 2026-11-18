@@ -15,7 +15,7 @@ export type ContactValues = { code: string; name: string; service: string; workT
 const blank: Person = { name: "", title: "", email: "", phone: "" };
 
 /** Shows the current logo with Change and Remove buttons; with no logo it shows the upload box. */
-function LogoField({ logo, name }: { logo: string; name: string }) {
+export function LogoField({ logo, name }: { logo: string; name: string }) {
   const [mode, setMode] = useState<"keep" | "change" | "remove">("keep");
   const [broken, setBroken] = useState(false);
   const accept = "image/jpeg,image/png,image/webp";

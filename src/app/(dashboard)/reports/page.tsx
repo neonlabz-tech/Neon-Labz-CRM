@@ -2,12 +2,11 @@ import { ReportTable } from "@/components/reports/report-table";
 import { SrsForm } from "@/components/reports/forms";
 import { Pagination, SearchBar } from "@/components/ui/list-controls";
 import { AddLink, Panel } from "@/components/ui/panel";
-import { ReportsTop } from "@/components/projects/reports-top";
 import { requireAction } from "@/lib/auth";
 import { reportScope } from "@/lib/report-scope";
 import { todayISO } from "@/lib/dates";
 import { escapeRegex, pageOf, limitOf, skipOf, param, type SearchParams } from "@/lib/pagination";
-import { isId } from "@/lib/project-access";
+import { isId, historyProjectCodes } from "@/lib/project-access";
 import { reportProjects } from "@/lib/report-page";
 import { deleteSrsAction } from "@/server/report-actions";
 import { Srs } from "@/models/report";
@@ -22,18 +21,18 @@ export default async function SrsPage({ searchParams }: { searchParams: Promise<
   const scope = reportScope(user, sp);
   const edit = scope.readOnly ? "" : param(sp, "edit");
   const adding = !scope.readOnly && param(sp, "new") === "1";
-  const filter = { ...scope.owner, ...(q ? { title: new RegExp(escapeRegex(q), "i") } : {}) };
+  // Reports of a project that is in History stay hidden until the project is moved back to active.
+  const filter = { ...scope.owner, projectCode: { $nin: await historyProjectCodes() }, ...(q ? { title: new RegExp(escapeRegex(q), "i") } : {}) };
 
   const { projects, names } = await reportProjects(user);
   const [rows, total, editing] = await Promise.all([
     Srs.find(filter).select("title projectCode date").sort({ createdAt: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
     Srs.countDocuments(filter),
-    isId(edit) ? Srs.findOne({ _id: edit, owner: user.username }).lean() : null,
+    isId(edit) ? Srs.findOne(user.role === "superadmin" ? { _id: edit } : { _id: edit, owner: user.username }).lean() : null,
   ]);
 
   return (
     <>
-      {user.role === "superadmin" && <ReportsTop own={scope.own} pm={scope.pm} />}
       {!scope.readOnly && <div className="mb-4 flex justify-end"><AddLink href="?new=1">Add SRS document</AddLink></div>}
       {(adding || editing) && (
         <Panel title={editing ? "Edit SRS document" : "Add SRS document"} closeHref="/reports">

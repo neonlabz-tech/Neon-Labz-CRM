@@ -28,7 +28,7 @@ export function TaskColumn({ projectCode, status, title, count, accepts, childre
         if (from === status) return;
         start(async () => { const result = await moveTaskAction(projectCode, id, status); toast(result.ok, result.message); });
       }}
-      className={cn("rounded-xl bg-canvas p-2.5 transition-colors", over && "bg-brand-100 ring-2 ring-brand-400", pending && "opacity-70")}
+      className={cn("rounded-xl bg-canvas p-2.5 text-ink transition-colors", over && "bg-brand-100 ring-2 ring-brand-400", pending && "opacity-70")}
     >
       <p className="mb-2 flex justify-between px-1 text-xs font-semibold uppercase tracking-wide text-muted"><span>{title}</span><span>{count}</span></p>
       <div className="min-h-12 space-y-2">{children}</div>

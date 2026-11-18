@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Flag, Pencil, Plus } from "lucide-react";
+import { Flag, History, Pencil, Plus } from "lucide-react";
 import { AccessBar } from "@/components/projects/access-bar";
 import { Kpis } from "@/components/dashboard/widgets";
+import { ArchiveProject } from "@/components/projects/project-actions";
 import { ProjectView } from "@/components/projects/project-view";
 import { MilestonesBoard } from "@/components/projects/milestones-board";
 import { Badge } from "@/components/ui/badge";
@@ -115,14 +116,14 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Projects" subtitle={own ? "Your projects, sprints, milestones and reports." : showArchived ? "Archived projects." : "Delivery work for clients."}>
+      <PageHeader title="Projects" subtitle={own ? "Your projects, sprints, milestones and reports." : showArchived ? "Projects in history." : "Delivery work for clients."}>
         <div className="flex gap-2">
-          <Link prefetch={false} href={`/projects${showArchived ? "" : "?archived=1"}${own ? `${showArchived ? "?" : "&"}own=1` : pm ? `${showArchived ? "?" : "&"}pm=${encodeURIComponent(pm)}` : ""}`} className="inline-flex h-11 items-center rounded-xl border border-line bg-white px-4 text-sm font-semibold hover:bg-brand-50">{showArchived ? "Active projects" : "Archived"}</Link>
+          <Link prefetch={false} href={`/projects${showArchived ? "" : "?archived=1"}${own ? `${showArchived ? "?" : "&"}own=1` : pm ? `${showArchived ? "?" : "&"}pm=${encodeURIComponent(pm)}` : ""}`} className="inline-flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-4 text-sm font-semibold hover:bg-brand-50">{showArchived ? "Active projects" : <><History className="h-4 w-4" />History</>}</Link>
           <Link prefetch={false} href={own ? "/projects/new?own=1" : "/projects/new"} className="brand-gradient inline-flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold text-white"><Plus className="h-4 w-4" />New project</Link>
         </div>
       </PageHeader>
-      {admin && <AccessBar own={own} pm={pm} path="/projects" accounts={accounts.map((a) => ({ username: a.username, label: a.fullName ? `${a.fullName} (${a.username})` : a.username }))} />}
-      <Kpis items={[{ label: "Total projects", value: inProgress + completed, hint: "In progress + completed" }, { label: "In progress", value: inProgress }, { label: "Completed", value: completed }, { label: "On hold", value: onHold, hint: "Includes archived" }]} />
+      {admin && <AccessBar own={own} editable pm={pm} path="/projects" accounts={accounts.map((a) => ({ username: a.username, label: a.fullName ? `${a.fullName} (${a.username})` : a.username }))} />}
+      {!showArchived && <Kpis items={[{ label: "Total projects", value: inProgress + completed, hint: "In progress + completed" }, { label: "In progress", value: inProgress }, { label: "Completed", value: completed }, { label: "On hold", value: onHold, hint: "Includes history" }]} />}
       <SearchBar
         keep={keep}
         q={q}
@@ -184,6 +185,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                       </DialogButton>
                     )}
                     {lanes.length > 0 && boardDialog(r)}
+                    {editShell && <ArchiveProject code={r.code} archived={showArchived} />}
                   </div>
                 );
               },

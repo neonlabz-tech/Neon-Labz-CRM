@@ -1,6 +1,6 @@
 import { can, type Action, type Role } from "./permissions";
 
-export type IconName = "search" | "dashboard" | "users" | "audit" | "account" | "leads" | "quotes" | "payments" | "approvals" | "clients" | "packages" | "projects" | "work" | "info" | "plans" | "hrms" | "finance" | "issues" | "productivity" | "activity" | "reports" | "mreports";
+export type IconName = "search" | "dashboard" | "users" | "audit" | "account" | "leads" | "quotes" | "payments" | "approvals" | "clients" | "packages" | "projects" | "work" | "info" | "plans" | "hrms" | "finance" | "issues" | "productivity" | "activity" | "reports" | "mreports" | "notifications";
 type Tab = { href: string; label: string; action?: Action };
 /** One sidebar entry. Its tabs are shown at the top of every page inside it. */
 type Area = { title: string; icon: IconName; action?: Action; own?: boolean; tabs: Tab[] };
@@ -24,7 +24,15 @@ const GROUPS: AreaGroup[] = [
           { href: "/approvals", label: "Approvals", action: "payments.approve" },
           { href: "/sales-reports", label: "Reports", action: "sales.targets" },
           { href: "/sales-team", label: "Team", action: "sales.targets" },
+          { href: "/sales-commission", label: "Commission", action: "sales.targets" },
           { href: "/sales-settings", label: "Settings", action: "sales.targets" },
+        ],
+      },
+      {
+        title: "Targets & Commission", icon: "productivity",
+        tabs: [
+          { href: "/my-targets", label: "Targets & Commission", action: "targets.own" },
+          { href: "/my-targets/history", label: "History", action: "targets.own" },
         ],
       },
       {
@@ -65,7 +73,12 @@ const GROUPS: AreaGroup[] = [
           { href: "/marketing/plans", label: "Content plans", action: "marketing.view" },
           { href: "/marketing/reports", label: "Reports", action: "marketing.view" },
           { href: "/marketing/progress", label: "Progress", action: "marketing.monitor" },
+          { href: "/content-tracker", label: "Content Tracker", action: "content.tab" },
         ],
+      },
+      {
+        title: "Content Tracker", icon: "plans", action: "content.sidebar",
+        tabs: [{ href: "/content-tracker", label: "Content Tracker", action: "content.track" }],
       },
     ],
   },
@@ -86,7 +99,7 @@ const GROUPS: AreaGroup[] = [
       { title: "Activity log", icon: "audit", tabs: [{ href: "/audit", label: "Activity log", action: "audit.view" }] },
     ],
   },
-  { title: "Account", areas: [{ title: "My account", icon: "account", tabs: [{ href: "/account", label: "My account" }] }] },
+  { title: "Account", areas: [{ title: "Notifications", icon: "notifications", tabs: [{ href: "/notifications", label: "Notifications" }] }, { title: "My account", icon: "account", tabs: [{ href: "/account", label: "My account" }] }] },
 ];
 
 export function navFor(role: Role): NavGroup[] {

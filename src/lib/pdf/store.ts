@@ -8,8 +8,8 @@ import { renderPdf } from "./render";
 export const letterheadAssets = async (): Promise<Assets> => ({ logo: await invoiceLogo(), font: await fontFace() });
 /** The quotation has a white header, so it uses the logo with dark lettering. */
 export const quotationAssets = async (): Promise<Assets> => ({ logo: await letterheadLogo(), font: await fontFace() });
-/** Invoices and package sheets also have a white header. */
-export const invoiceAssets = async (): Promise<Assets> => ({ logo: await letterheadLogo(), font: await fontFace() });
+/** Invoices and package sheets have a dark header, so they use the logo with white lettering. */
+export const invoiceAssets = async (): Promise<Assets> => ({ logo: await invoiceLogo(), font: await fontFace() });
 
 /** Renders the document and saves it in Cloudflare R2. The random part keeps the link private to people who were given it. */
 export async function renderAndStore(folder: R2Folder, name: string, html: string): Promise<string> {

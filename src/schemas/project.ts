@@ -40,6 +40,7 @@ export const milestoneSchema = z
     startDate: day,
     dueDate: z.string().min(1, "Due date is required.").regex(ISO_DATE, "Choose a valid date."),
     department: z.enum(DEPARTMENTS),
+    audience: z.enum(["", "pm", "marketing", "both"]).default(""),
     assignees: codes.refine((list) => list.some(Boolean), "Assign at least one employee to this milestone."),
   })
   .refine(ordered, orderedMsg);

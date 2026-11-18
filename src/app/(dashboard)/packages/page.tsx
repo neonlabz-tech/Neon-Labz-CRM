@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { DialogButton } from "@/components/ui/dialog-button";
-import { Details } from "@/components/ui/details";
+import { PackageView } from "@/components/packages/package-view";
 import Link from "next/link";
 import { PdfLink } from "@/components/ui/pdf-link";
 import { Eye, Plus } from "lucide-react";
@@ -70,19 +70,18 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
             { header: "Duration", cell: (r) => r.duration },
             { header: "Includes", cell: (r) => `${r.features.length} items` },
             { header: "Status", cell: (r) => <Badge tone={r.status === "active" ? "success" : "warning"}>{r.status === "active" ? "Active" : "Archived"}</Badge> },
+            ...(manage ? [{ header: "PDF", cell: (r: (typeof rows)[number]) => <PdfLink kind="package" id={String(r._id)} /> }] : []),
             {
-              header: "View",
+              header: "Actions",
               cell: (r: (typeof rows)[number]) => (
-                <DialogButton label="View full package" title={r.name} icon={<Eye />}>
-                  {r.cover && <Image src={r.cover} alt="" width={640} height={320} className="mb-4 h-40 w-full rounded-xl object-cover" />}
-                  <Details items={[{ label: "Category", value: r.category }, { label: "Price", value: formatMoney(r.price) }, { label: "Duration", value: r.duration }, { label: "Status", value: r.status === "active" ? "Active" : "Archived" }, { label: "Description", value: r.description }]} />
-                  <h3 className="mb-2 mt-5 text-sm font-semibold">What is included</h3>
-                  {r.features.length === 0 ? <p className="text-muted">No items listed.</p> : <ul className="list-disc space-y-1 pl-5">{r.features.map((f: string, i: number) => <li key={`${i}-${f}`}>{f}</li>)}</ul>}
-                </DialogButton>
+                <div className="flex gap-2">
+                  <DialogButton label="View full package" title={r.name} subtitle={r.category} icon={<Eye />}>
+                    <PackageView pkg={{ name: r.name, category: r.category, description: r.description, price: r.price, duration: r.duration, features: r.features, status: r.status, icon: r.icon }} />
+                  </DialogButton>
+                  {manage && <PackageRowActions id={String(r._id)} />}
+                </div>
               ),
             },
-            { header: "PDF", cell: (r: (typeof rows)[number]) => <PdfLink kind="package" id={String(r._id)} /> },
-            ...(manage ? [{ header: "Actions", cell: (r: (typeof rows)[number]) => <PackageRowActions id={String(r._id)} status={r.status} /> }] : []),
           ]}
         />
       )}

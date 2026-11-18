@@ -1,4 +1,5 @@
 import { Field, SelectField } from "@/components/ui/field";
+import { AUDIENCES } from "@/lib/audience";
 import { ActionForm } from "@/components/ui/form";
 import { saveMilestoneAction } from "@/server/project-actions";
 
@@ -6,9 +7,11 @@ type MilestoneView = { id: string; title: string; startDate: string; dueDate: st
 type Props = {
   projectCode: string; type: "software" | "marketing" | "both"; allowed: ("software" | "marketing")[];
   employees: { username: string; label: string }[]; milestone?: MilestoneView;
+  /** The Super Admin adding to a project with both parts chooses which team it goes to, or both. */
+  admin?: boolean;
 };
 
-export function MilestoneForm({ projectCode, type, allowed, employees, milestone }: Props) {
+export function MilestoneForm({ projectCode, type, allowed, employees, milestone, admin = false }: Props) {
   return (
     <ActionForm action={saveMilestoneAction} submit={milestone ? "Save milestone" : "Add milestone"} resetOnSuccess={!milestone} className="grid gap-3 sm:grid-cols-2">
       <input type="hidden" name="projectCode" value={projectCode} />
@@ -16,7 +19,14 @@ export function MilestoneForm({ projectCode, type, allowed, employees, milestone
       <div className="sm:col-span-2"><Field label="Milestone" name="title" defaultValue={milestone?.title} required /></div>
       <Field label="Start" name="startDate" type="date" defaultValue={milestone?.startDate} />
       <Field label="Due" required name="dueDate" type="date" defaultValue={milestone?.dueDate} />
-      {type === "both" ? (
+      {admin && !milestone && type === "both" ? (
+        <>
+          <SelectField label="Send to" required name="audience" defaultValue="both">
+            {Object.entries(AUDIENCES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </SelectField>
+          <input type="hidden" name="department" value="software" />
+        </>
+      ) : type === "both" ? (
         <SelectField label="Part of the project" required name="department" defaultValue={milestone?.department ?? allowed[0]}>
           {allowed.map((d) => <option key={d} value={d}>{d === "software" ? "Software" : "Marketing"}</option>)}
         </SelectField>

@@ -16,6 +16,8 @@ const schema = new mongoose.Schema(
     steps: { type: String, default: "" },
     expected: { type: String, default: "" },
     createdBy: { type: String, required: true, index: true },
+    /** Set by the Super Admin: which team the issue goes to. Blank means only its creator sees it, as before. */
+    audience: { type: String, enum: ["", "pm", "marketing", "both"], default: "" },
   },
   { timestamps: true }
 );

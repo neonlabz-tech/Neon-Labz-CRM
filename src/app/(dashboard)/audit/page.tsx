@@ -14,7 +14,7 @@ const tone = (action: string) => (action.includes("denied") || action.includes("
 const LABELS: Record<string, string> = {
   "login.ok": "Signed in", "login.failed": "Sign-in failed", "login.denied": "Sign-in blocked", "logout": "Signed out",
   "payment.approved": "Payment approved", "payment.cancelled": "Payment rejected",
-  "project.created": "Project created", "project.updated": "Project updated", "project.archived": "Project archived", "project.restored": "Project restored",
+  "project.created": "Project created", "project.updated": "Project updated", "project.archived": "Project moved to history", "project.restored": "Project moved back to active",
 };
 /** "hrms.employee.created" reads as "Hrms employee created" when there is no hand-written label. */
 const readable = (action: string) => LABELS[action] ?? (action.replace(/[._]/g, " ").replace(/^./, (c) => c.toUpperCase()));
