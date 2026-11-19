@@ -15,6 +15,7 @@ export const manualSaleSchema = z
     collected: money("Collected amount must be zero or more.").default(0),
     status: z.enum(MANUAL_SALE_STATUSES, "Choose a status."),
     goesTo: z.enum(GOES_TO, "Choose who handles this sale."),
+    guest: z.literal("1").optional(),
   })
   .refine((v) => v.collected <= v.amount, { path: ["collected"], message: "Collection cannot exceed the sale value." })
   .refine((v) => v.goesTo !== "own" || v.owner === UNASSIGNED, { path: ["goesTo"], message: "Only an unassigned sale can be handled by the Super Admin." });

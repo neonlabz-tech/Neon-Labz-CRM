@@ -30,6 +30,8 @@ const schema = new mongoose.Schema(
     collected: { type: Number, default: 0, min: 0 },
     status: { type: String, enum: MANUAL_SALE_STATUSES, default: "pending" },
     goesTo: { type: String, enum: GOES_TO, default: "project" },
+    /** Added with "Add guest": an existing client, not a new sale. */
+    guest: { type: Boolean, default: false },
     /** Set when the sale is confirmed and the client joins the paying clients. */
     clientCode: { type: String, default: "" },
     payments: { type: [payment], default: [] },

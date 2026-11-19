@@ -21,8 +21,9 @@ export const workTypeOfClient = (client: { workType?: string | null; service?: s
 /** Which clients a role works with. Clients saved before workType existed are placed by their service. */
 export function clientWorkFilter(role: string): Record<string, unknown> {
   const legacy = { workType: null };
-  if (role === "pm") return { $or: [{ workType: { $in: ["software", "both"] } }, { ...legacy, service: { $not: new RegExp(MARKETING_WORDS, "i") } }] };
-  if (role === "marketing") return { $or: [{ workType: { $in: ["marketing", "both"] } }, { ...legacy, service: new RegExp(MARKETING_WORDS, "i") }] };
+  const shared = { ownOnly: { $ne: true } };
+  if (role === "pm") return { $and: [shared, { $or: [{ workType: { $in: ["software", "both"] } }, { ...legacy, service: { $not: new RegExp(MARKETING_WORDS, "i") } }] }] };
+  if (role === "marketing") return { $and: [shared, { $or: [{ workType: { $in: ["marketing", "both"] } }, { ...legacy, service: new RegExp(MARKETING_WORDS, "i") }] }] };
   return {};
 }
 
