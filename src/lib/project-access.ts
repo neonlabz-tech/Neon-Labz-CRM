@@ -3,6 +3,7 @@ import mongoose, { isValidObjectId } from "mongoose";
 import { connectDb } from "./db";
 import { nextMilestoneStatus, type MilestoneStatus, type TaskStatus } from "./projects";
 import { USERNAME_PATTERN, type Role } from "./permissions";
+import { Client } from "@/models/client";
 import { Department, Employee } from "@/models/hrms";
 import { Milestone } from "@/models/milestone";
 import { Project } from "@/models/project";
@@ -38,14 +39,20 @@ export async function historyClientCodes(): Promise<string[]> {
 }
 
 /** Which projects a person may see. Employees only see work they are assigned to. */
+async function ownOnlyClientCodes(): Promise<string[]> {
+  await connectDb();
+  return Client.distinct("code", { ownOnly: true });
+}
+
 export async function visibleProjectFilter(user: Pick<SessionUser, "role" | "username">): Promise<Record<string, unknown>> {
   switch (user.role) {
     case "superadmin":
       return {};
+    // A client the Super Admin keeps for themselves (Goes to = Own) has projects only the Super Admin sees.
     case "pm":
-      return { type: { $in: ["software", "both"] } };
+      return { type: { $in: ["software", "both"] }, clientCode: { $nin: await ownOnlyClientCodes() } };
     case "marketing":
-      return { type: { $in: ["marketing", "both"] } };
+      return { type: { $in: ["marketing", "both"] }, clientCode: { $nin: await ownOnlyClientCodes() } };
     case "employee": {
       await connectDb();
       const viaMilestone = await Milestone.distinct("projectId", { assignees: user.username });

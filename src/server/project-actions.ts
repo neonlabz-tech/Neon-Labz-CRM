@@ -30,12 +30,14 @@ export async function createProjectAction(_: ActionState, formData: FormData): P
   const allowed = (TYPES_BY_ROLE as Record<string, readonly string[]>)[user.role] ?? [];
   if (!allowed.includes(input.type)) return fail("You cannot create that type of project.");
 
-  if (input.startDate && !dateIsAllowed(input.startDate)) return fail("Start date cannot be before today.");
-  if (input.dueDate && !dateIsAllowed(input.dueDate)) return fail("Due date cannot be before today.");
-
   await connectDb();
-  const client = await Client.findOne({ code: input.clientCode }).select("name service workType ownOnly").lean();
+  const client = await Client.findOne({ code: input.clientCode }).select("name service workType ownOnly guest").lean();
   if (!client || (client.ownOnly && user.role !== "superadmin")) return fail("Choose a client.");
+  // Dates in the past are allowed only for a guest client (an old project brought in).
+  if (!client.guest) {
+    if (input.startDate && !dateIsAllowed(input.startDate)) return fail("Start date cannot be before today.");
+    if (input.dueDate && !dateIsAllowed(input.dueDate)) return fail("Due date cannot be before today.");
+  }
   const bought = workTypeOfClient(client);
   if (input.type === "both" ? bought !== "both" : bought !== "both" && bought !== input.type) return { ok: false, message: "This client did not buy that kind of work.", errors: { type: `${client.name} bought ${bought} work, so choose a matching project type.` } };
   if (await Project.exists({ clientCode: input.clientCode, type: input.type, archived: false })) return { ok: false, message: "This client already has that project.", errors: { clientCode: "An active project of this type already exists for this client." } };
@@ -58,8 +60,9 @@ export async function updateProjectAction(_: ActionState, formData: FormData): P
   const project = await findProject(user, code);
   if (!project) return fail("Project not found.");
   if (!canEditProjectShell(user.role, project.type)) return fail("You cannot change this project's details.");
-  if (data.startDate && !dateIsAllowed(data.startDate, project.startDate ?? "")) return fail("Start date cannot be before today.");
-  if (data.dueDate && !dateIsAllowed(data.dueDate, project.dueDate ?? "")) return fail("Due date cannot be before today.");
+  const guest = Boolean(await Client.exists({ code: project.clientCode, guest: true }));
+  if (!guest && data.startDate && !dateIsAllowed(data.startDate, project.startDate ?? "")) return fail("Start date cannot be before today.");
+  if (!guest && data.dueDate && !dateIsAllowed(data.dueDate, project.dueDate ?? "")) return fail("Due date cannot be before today.");
   Object.assign(project, data);
   await project.save();
   await writeAudit(user.username, "project.updated", { code });
@@ -130,13 +133,14 @@ export async function saveMilestoneAction(_: ActionState, formData: FormData): P
 
   const existing = id && isId(id) ? await Milestone.findOne({ _id: id, projectId: project._id }) : null;
   if (id && !existing) return fail("Milestone not found.");
+  const guestClient = Boolean(await Client.exists({ code: project.clientCode, guest: true }));
   for (const department of departments) {
     if (!teamOf(department).length) {
       return fail(departments.length > 1 ? `Choose at least one ${department === "marketing" ? "marketing" : "software"} employee, because this goes to both teams.` : "Assign at least one employee to this milestone.");
     }
     if (department === "marketing") {
-      if (data.startDate && !dateIsAllowed(data.startDate, existing?.startDate ?? "")) return fail("Start date cannot be before today.");
-      if (!dateIsAllowed(data.dueDate, existing?.dueDate ?? "")) return fail("Due date cannot be before today.");
+      if (!guestClient && data.startDate && !dateIsAllowed(data.startDate, existing?.startDate ?? "")) return fail("Start date cannot be before today.");
+      if (!guestClient && !dateIsAllowed(data.dueDate, existing?.dueDate ?? "")) return fail("Due date cannot be before today.");
     }
   }
 

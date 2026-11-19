@@ -1,9 +1,11 @@
 import { BulkLeads } from "@/components/leads/bulk-leads";
 import { ImportLeads } from "@/components/leads/import-leads";
 import Link from "next/link";
-import { AlertTriangle, CalendarClock, CheckCircle2, Download, PhoneCall, Pencil, Plus, Users } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Download, PhoneCall, Pencil, Plus, UserPlus, Users } from "lucide-react";
 import { AssignLead } from "@/components/leads/assign-lead";
 import { CallHistory } from "@/components/leads/call-history";
+import { GuestActions } from "@/components/leads/guest-actions";
+import { GuestForm } from "@/components/leads/guest-form";
 import { LeadForm } from "@/components/leads/lead-form";
 import { LeadRowActions } from "@/components/leads/lead-actions";
 import { Badge } from "@/components/ui/badge";
@@ -20,9 +22,14 @@ import { can, ownerScope } from "@/lib/permissions";
 import { formatDateTime, formatDay } from "@/lib/utils";
 import { dayRange, periodRange } from "@/lib/sales-range";
 import { CALL_OUTCOMES, LEAD_SERVICES, LEAD_SOURCES, LEAD_STAGES, Lead } from "@/models/lead";
+import { Client } from "@/models/client";
+import { ManualSale } from "@/models/manual-sale";
+import { Package } from "@/models/package";
 import { User } from "@/models/user";
 
 export const metadata = { title: "Leads" };
+
+const GOES_LABEL: Record<string, string> = { project: "Project", marketing: "Marketing", both: "Project + Marketing", own: "Super Admin (own)" };
 
 const tone = (status: string) => (status === "Converted" ? "success" : status === "Lost" ? "danger" : status === "New" ? "info" : "brand");
 
@@ -37,6 +44,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const source = param(sp, "source");
   const page = pageOf(sp);
   const own = ownView(user.role, sp);
+  // Guests are existing clients the Super Admin brought in; they have their own tab and never count as leads.
+  const guestView = own && param(sp, "view") === "guest";
   const today = todayISO();
   const { period, picked, range } = periodRange(sp, today);
   const admin = user.role === "superadmin" && !own;
@@ -72,15 +81,52 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
 
   const Bulk = canDelete ? BulkLeads : Plain;
 
+  const guests = guestView ? await ManualSale.find({ guest: true }).select("saleCode business clientCode service goesTo date createdAt").sort({ createdAt: -1 }).limit(200).lean() : [];
+  const guestChoices = own
+    ? await Promise.all([Client.find().select("name").sort({ name: 1 }).limit(500).lean(), Package.find({ status: "active" }).select("name category").sort({ name: 1 }).limit(200).lean()])
+    : null;
+  const tabClass = (on: boolean) => `inline-flex h-9 items-center rounded-lg px-4 text-sm font-semibold ${on ? "bg-brand-50 text-brand-700" : "text-muted hover:bg-brand-50"}`;
+
   return (
     <>
       <PageHeader title="Leads" subtitle={user.role === "sales" || own ? "Your leads and follow-ups." : "Every lead across the sales team."}>
         <div className="flex flex-wrap gap-2">
         {canDelete && <ImportLeads today={today} sources={[...LEAD_SOURCES]} services={[...LEAD_SERVICES]} stages={[...LEAD_STAGES]} sellers={sellers.map((u) => ({ username: u.username, label: u.fullName || u.username }))} />}
         {can(user.role, "leads.export") && <a href={`/leads/export?${new URLSearchParams({ q, status, source, period, from: picked.from, to: picked.to, seller: range.seller, ...keepOwn(own) })}`} className="inline-flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-5 text-sm font-semibold hover:bg-brand-50"><Download className="h-4 w-4" />Export CSV</a>}
+        {guestChoices && (
+          <DialogButton label="Add guest" title="Add guest client" subtitle="An existing client with a running project" headerIcon={<UserPlus className="h-5 w-5" />} trigger={<span className="inline-flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-5 text-sm font-semibold text-ink hover:bg-brand-50"><UserPlus className="h-4 w-4" />Add guest</span>}>
+            <GuestForm today={today} clients={guestChoices[0].map((c) => c.name)} services={guestChoices[1].map((p) => p.name)} categories={Object.fromEntries(guestChoices[1].map((p) => [p.name.toLowerCase(), p.category]))} />
+          </DialogButton>
+        )}
         <Link prefetch={false} href={own ? "/leads/new?own=1" : "/leads/new"} className="brand-gradient inline-flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Add lead</Link>
         </div>
       </PageHeader>
+      {own && (
+        <div className="mb-4 flex gap-2">
+          <Link prefetch={false} href="/leads?own=1" className={tabClass(!guestView)}>Leads</Link>
+          <Link prefetch={false} href="/leads?own=1&view=guest" className={tabClass(guestView)}>Guest</Link>
+        </div>
+      )}
+      {guestView ? (
+        guests.length === 0 ? (
+          <EmptyState title="No guest clients yet" text="Use Add guest for an existing client who already has a running project." />
+        ) : (
+          <DataTable
+            rows={guests}
+            rowKey={(r) => r.saleCode}
+            columns={[
+              { header: "#", cell: (r) => guests.findIndex((x) => x.saleCode === r.saleCode) + 1 },
+              { header: "Client", cell: (r) => <span className="block"><span className="font-semibold">{r.business}</span>{r.clientCode && <span className="mt-1 block text-xs text-muted">{r.clientCode}</span>}</span> },
+              { header: "Service or package", cell: (r) => <span className="block max-w-72 whitespace-normal">{r.service}</span> },
+              { header: "Goes to", cell: (r) => GOES_LABEL[r.goesTo ?? "project"] ?? r.goesTo },
+              { header: "Old project date", cell: (r) => formatDay(r.date) },
+              { header: "Status", cell: () => <Badge tone="info">Guest</Badge> },
+              { header: "Actions", cell: (r) => <GuestActions id={String(r._id)} /> },
+            ]}
+          />
+        )
+      ) : (
+        <>
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <ColorCard tone={0} label="Leads" value={everyLead} icon={<Users className="h-5 w-5" />} />
         <ColorCard tone={2} label="Overdue" value={overdueCount} hint="Follow-up date has passed" icon={<AlertTriangle className="h-5 w-5" />} />
@@ -127,6 +173,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         /></Bulk>
       )}
       <Pagination page={page} total={total} query={{ q, status, source, period, from: picked.from, to: picked.to, seller: range.seller, ...keepOwn(own) }} />
+        </>
+      )}
     </>
   );
 }

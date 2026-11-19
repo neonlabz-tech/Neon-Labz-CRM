@@ -22,6 +22,8 @@ const schema = new mongoose.Schema(
     salesOwner: { type: String, required: true },
     /** A client the Super Admin keeps for themselves (a manual sale that goes to "Own"): the PM and marketing never see it. */
     ownOnly: { type: Boolean, default: false },
+    /** An existing client brought in by the Super Admin (an old project): its dates may be in the past. */
+    guest: { type: Boolean, default: false },
     approvedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }

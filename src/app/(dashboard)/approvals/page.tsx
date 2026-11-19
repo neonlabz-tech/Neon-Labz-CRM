@@ -69,7 +69,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   if (range.seller) manualFilter.owner = range.seller;
   if (days) manualFilter.date = days;
   const [manualConfirmed, manualRows, editing] = await Promise.all([
-    ManualSale.aggregate<{ n: number; collected: number; balance: number }>([{ $match: { ...manualFilter, status: "confirmed" } }, { $group: { _id: null, n: { $sum: 1 }, collected: { $sum: "$collected" }, balance: { $sum: { $subtract: ["$amount", "$collected"] } } } }]),
+    ManualSale.aggregate<{ n: number; collected: number; balance: number }>([{ $match: { ...manualFilter, status: "confirmed", guest: { $ne: true } } }, { $group: { _id: null, n: { $sum: 1 }, collected: { $sum: "$collected" }, balance: { $sum: { $subtract: ["$amount", "$collected"] } } } }]),
     status === "manual"
       ? ManualSale.find({ ...manualFilter, ...(q ? { $or: [{ business: new RegExp(escapeRegex(q), "i") }, { saleCode: new RegExp(escapeRegex(q), "i") }] } : {}) }).sort({ createdAt: -1 }).limit(200).lean()
       : Promise.resolve([]),
@@ -142,7 +142,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
             rowKey={(r) => String(r._id)}
             columns={[
               { header: "Sale ID", cell: (r) => r.saleCode },
-              { header: "Client", cell: (r) => <span>{r.business}{r.clientCode && <span className="font-normal text-muted"> · {r.clientCode}</span>}</span> },
+              { header: "Client", cell: (r) => <span>{r.business}{r.clientCode && <span className="font-normal text-muted"> · {r.clientCode}</span>}{r.guest && <Badge tone="info">Guest</Badge>}</span> },
               { header: "Service", cell: (r) => r.service },
               { header: "Sales", cell: (r) => (r.owner === "unassigned" ? "Unassigned" : r.owner) },
               { header: "Goes to", cell: (r) => GOES_LABEL[r.goesTo] ?? "Project" },
@@ -159,7 +159,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
                   </span>
                 )
               ) },
-              { header: "Actions", cell: (r) => (
+              { header: "Actions", cell: (r) => r.guest ? <span className="text-xs text-muted">Leads, Guest</span> : (
                 <div className="flex items-center gap-2">
                   {r.status === "confirmed" && r.amount - r.collected > 0 && <SalePaymentButton id={String(r._id)} code={r.saleCode} balance={Math.round((r.amount - r.collected) * 100) / 100} today={today} />}
                   <ManualSaleActions id={String(r._id)} status={r.status} locked={(r.payments ?? []).length > 0} editHref={`/approvals?status=manual&edit=${String(r._id)}`} />

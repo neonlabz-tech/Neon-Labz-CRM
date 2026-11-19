@@ -16,6 +16,7 @@ import { isId } from "@/lib/project-access";
 import { manualSaleSchema, salePaymentSchema } from "@/schemas/manual-sale";
 import { Client } from "@/models/client";
 import { MANUAL_SALE_STATUSES, ManualSale, UNASSIGNED } from "@/models/manual-sale";
+import { Project } from "@/models/project";
 import { User } from "@/models/user";
 import type { ActionState } from "@/types";
 
@@ -27,7 +28,7 @@ function refresh() {
  * A confirmed sale makes its client a client and tells whoever will do the work.
  * The client is found by name, so a second sale for the same client does not create a second record.
  */
-async function joinPayingClients(sale: { _id: unknown; saleCode: string; business: string; service: string; owner: string; goesTo: string }, adminName: string) {
+async function joinPayingClients(sale: { _id: unknown; saleCode: string; business: string; service: string; owner: string; goesTo: string; guest?: boolean }, adminName: string) {
   const workType = sale.goesTo === "marketing" ? "marketing" : sale.goesTo === "both" ? "both" : sale.goesTo === "project" ? "software" : workTypeOf(sale.service);
   const known = await Client.findOne({ name: new RegExp(`^${escapeRegex(sale.business)}$`, "i") }).select("code workType leadId ownOnly").lean();
   let code = known?.code ?? "";
@@ -38,6 +39,7 @@ async function joinPayingClients(sale: { _id: unknown; saleCode: string; busines
       // A sale the Super Admin keeps for themselves shows under "Own projects".
       salesOwner: sale.owner !== UNASSIGNED ? sale.owner : sale.goesTo === "own" ? adminName : UNASSIGNED,
       ownOnly: sale.goesTo === "own",
+      guest: Boolean(sale.guest),
     });
   } else if (sale.goesTo === "own") {
     // Only a client this very sale made can be kept private; a client who already paid through the normal flow stays visible.
@@ -68,25 +70,38 @@ export async function saveManualSaleAction(_: ActionState, formData: FormData): 
   const admin = await requireAction("payments.approve");
   const parsed = manualSaleSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return invalid(parsed.error);
-  const { id, ...data } = parsed.data;
+  const { id, guest: guestFlag, ...fields } = parsed.data;
+  const guest = guestFlag === "1";
+  // "Add guest" records an existing client: no value, nothing collected, no salesperson, confirmed straight away.
+  const data = guest ? { ...fields, owner: UNASSIGNED, amount: 0, collected: 0, status: "confirmed" as const } : fields;
   await connectDb();
   if (data.owner !== UNASSIGNED && !(await User.exists({ username: data.owner, role: "sales", active: true }))) return { ok: false, message: "Choose a salesperson.", errors: { owner: "Choose a salesperson from the list." } };
 
-  let saved: { _id: unknown; saleCode: string; clientCode: string; status: string } | null;
+  // A guest is a client who is not in the system yet; a name that is already a client is refused so nobody is merged or switched by mistake.
+  if (guest && !id) {
+    const taken = await Client.findOne({ name: new RegExp(`^${escapeRegex(data.business)}$`, "i") }).select("code").lean();
+    if (taken) {
+      const message = `${data.business} is already a client (${taken.code}). Start its project from Clients.`;
+      return { ok: false, message, errors: { business: message } };
+    }
+  }
+
+  let saved: { _id: unknown; saleCode: string; clientCode: string; status: string; guest?: boolean } | null;
   let goesToChanged = false;
   if (id) {
     const before = isId(id) ? await ManualSale.findById(id).lean() : null;
     if (!before) return fail("That sale was not found.");
+    if (before.guest) return fail("A guest client is managed from Leads, Guest.");
     if ((before.payments ?? []).length > 0 && data.status !== "confirmed") return { ok: false, message: "This sale has payments.", errors: { status: "A sale with payments must stay confirmed." } };
     // Once receipts exist, the collected total only changes through "Add payment".
     const collected = (before.payments ?? []).length > 0 ? before.collected : data.collected;
     if (cents(data.amount) < cents(collected)) return { ok: false, message: "The sale value is below what was collected.", errors: { amount: `The sale value can't be less than the ${formatMoney(before.collected)} already collected.` } };
     goesToChanged = before.goesTo !== data.goesTo;
     await ManualSale.updateOne({ _id: id }, { ...data, collected });
-    saved = { _id: before._id, saleCode: before.saleCode, clientCode: before.clientCode, status: before.status };
+    saved = { _id: before._id, saleCode: before.saleCode, clientCode: before.clientCode, status: before.status, guest: Boolean(before.guest) };
   } else {
-    const created = await ManualSale.create({ ...data, payments: [], saleCode: manualSaleCode(await nextSeq("manualSale")) });
-    saved = { _id: created._id, saleCode: created.saleCode, clientCode: "", status: "pending" };
+    const created = await ManualSale.create({ ...data, ...(guest ? { guest: true } : {}), payments: [], saleCode: manualSaleCode(await nextSeq("manualSale")) });
+    saved = { _id: created._id, saleCode: created.saleCode, clientCode: "", status: "pending", guest };
   }
   if (data.status === "confirmed" && saved.status !== "confirmed") {
     await joinPayingClients({ ...saved, ...data }, admin.username);
@@ -97,6 +112,10 @@ export async function saveManualSaleAction(_: ActionState, formData: FormData): 
   }
   await writeAudit(admin.username, id ? "sale.manual.updated" : "sale.manual.created", { business: data.business, amount: data.amount });
   refresh();
+  if (guest) {
+    revalidatePath("/leads");
+    return done("Guest client added.");
+  }
   redirect("/approvals?status=manual");
 }
 
@@ -127,6 +146,22 @@ export async function deleteManualSaleAction(id: string): Promise<ActionState> {
   await writeAudit(admin.username, "sale.manual.deleted", { id });
   refresh();
   return done("Sale deleted.");
+}
+
+/** Removes a guest client added by mistake, together with its client record, unless a project was already started for it. */
+export async function deleteGuestAction(id: string): Promise<ActionState> {
+  const admin = await requireAction("payments.approve");
+  await connectDb();
+  const sale = isId(id) ? await ManualSale.findOne({ _id: id, guest: true }).select("business clientCode").lean() : null;
+  if (!sale) return fail("That guest was not found.");
+  if (sale.clientCode && (await Project.exists({ clientCode: sale.clientCode }))) return fail("A project was already started for this guest, so it can't be removed.");
+  if (sale.clientCode) await Client.deleteOne({ code: sale.clientCode, guest: true });
+  await ManualSale.deleteOne({ _id: sale._id });
+  await writeAudit(admin.username, "sale.guest.deleted", { business: sale.business });
+  refresh();
+  revalidatePath("/leads");
+  revalidatePath("/clients");
+  return done("Guest removed.");
 }
 
 /** Adds one payment to a confirmed sale. Its receipt is made from it and the collected total goes up. */
