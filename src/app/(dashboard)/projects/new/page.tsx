@@ -24,7 +24,7 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
   await backfillWorkTypes();
   await connectDb();
   const own = ownView(user.role, await searchParams);
-  const clients = await Client.find({ $and: [clientWorkFilter(user.role), ...(own ? [{ salesOwner: user.username }] : [])] }).select("code name workType service").sort({ name: 1 }).limit(500).lean();
+  const clients = await Client.find({ $and: [clientWorkFilter(user.role), ...(own ? [{ salesOwner: user.username }] : [{ ownOnly: { $ne: true } }])] }).select("code name workType service").sort({ name: 1 }).limit(500).lean();
   const types = TYPES[user.role as keyof typeof TYPES] ?? [];
 
   return (

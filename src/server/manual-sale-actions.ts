@@ -29,7 +29,7 @@ function refresh() {
  */
 async function joinPayingClients(sale: { _id: unknown; saleCode: string; business: string; service: string; owner: string; goesTo: string }, adminName: string) {
   const workType = sale.goesTo === "marketing" ? "marketing" : sale.goesTo === "both" ? "both" : sale.goesTo === "project" ? "software" : workTypeOf(sale.service);
-  const known = await Client.findOne({ name: new RegExp(`^${escapeRegex(sale.business)}$`, "i") }).select("code workType").lean();
+  const known = await Client.findOne({ name: new RegExp(`^${escapeRegex(sale.business)}$`, "i") }).select("code workType leadId ownOnly").lean();
   let code = known?.code ?? "";
   if (!code) {
     code = clientCode(await nextSeq("client"));
@@ -37,7 +37,13 @@ async function joinPayingClients(sale: { _id: unknown; saleCode: string; busines
       code, name: sale.business, service: sale.service, workType, leadId: sale.saleCode,
       // A sale the Super Admin keeps for themselves shows under "Own projects".
       salesOwner: sale.owner !== UNASSIGNED ? sale.owner : sale.goesTo === "own" ? adminName : UNASSIGNED,
+      ownOnly: sale.goesTo === "own",
     });
+  } else if (sale.goesTo === "own") {
+    // Only a client this very sale made can be kept private; a client who already paid through the normal flow stays visible.
+    if (known?.leadId === sale.saleCode) await Client.updateOne({ code }, { ownOnly: true });
+  } else if (known?.ownOnly) {
+    await Client.updateOne({ code }, { ownOnly: false });
   }
   await ManualSale.updateOne({ _id: sale._id }, { clientCode: code });
   // A returning client who now buys the other kind of work becomes "both".
@@ -67,6 +73,7 @@ export async function saveManualSaleAction(_: ActionState, formData: FormData): 
   if (data.owner !== UNASSIGNED && !(await User.exists({ username: data.owner, role: "sales", active: true }))) return { ok: false, message: "Choose a salesperson.", errors: { owner: "Choose a salesperson from the list." } };
 
   let saved: { _id: unknown; saleCode: string; clientCode: string; status: string } | null;
+  let goesToChanged = false;
   if (id) {
     const before = isId(id) ? await ManualSale.findById(id).lean() : null;
     if (!before) return fail("That sale was not found.");
@@ -74,6 +81,7 @@ export async function saveManualSaleAction(_: ActionState, formData: FormData): 
     // Once receipts exist, the collected total only changes through "Add payment".
     const collected = (before.payments ?? []).length > 0 ? before.collected : data.collected;
     if (cents(data.amount) < cents(collected)) return { ok: false, message: "The sale value is below what was collected.", errors: { amount: `The sale value can't be less than the ${formatMoney(before.collected)} already collected.` } };
+    goesToChanged = before.goesTo !== data.goesTo;
     await ManualSale.updateOne({ _id: id }, { ...data, collected });
     saved = { _id: before._id, saleCode: before.saleCode, clientCode: before.clientCode, status: before.status };
   } else {
@@ -83,6 +91,9 @@ export async function saveManualSaleAction(_: ActionState, formData: FormData): 
   if (data.status === "confirmed" && saved.status !== "confirmed") {
     await joinPayingClients({ ...saved, ...data }, admin.username);
     await openingReceipt(saved._id);
+  } else if (data.status === "confirmed" && (goesToChanged || data.goesTo === "own")) {
+    // The sale was confirmed earlier and "Goes to" changed since: show or hide the client for the right teams.
+    await joinPayingClients({ ...saved, ...data }, admin.username);
   }
   await writeAudit(admin.username, id ? "sale.manual.updated" : "sale.manual.created", { business: data.business, amount: data.amount });
   refresh();

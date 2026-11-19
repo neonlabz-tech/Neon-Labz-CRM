@@ -20,6 +20,8 @@ const schema = new mongoose.Schema(
     subContacts: { type: [person], default: [] },
     leadId: { type: String, required: true },
     salesOwner: { type: String, required: true },
+    /** A client the Super Admin keeps for themselves (a manual sale that goes to "Own"): the PM and marketing never see it. */
+    ownOnly: { type: Boolean, default: false },
     approvedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
@@ -28,4 +30,6 @@ schema.index({ name: 1 });
 schema.index({ createdAt: -1 });
 
 export type ClientDoc = InferSchemaType<typeof schema>;
+// While developing, the dev server keeps the model from before an edit; drop it so a changed schema (like ownOnly) takes effect without a restart.
+if (process.env.NODE_ENV !== "production" && mongoose.models.Client) mongoose.deleteModel("Client");
 export const Client: Model<ClientDoc> = (mongoose.models.Client as Model<ClientDoc>) || mongoose.model<ClientDoc>("Client", schema);

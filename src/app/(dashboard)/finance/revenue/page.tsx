@@ -15,12 +15,14 @@ import { pageOf, limitOf, skipOf, param, type SearchParams } from "@/lib/paginat
 import { isId } from "@/lib/project-access";
 import { deleteRevenueAction } from "@/server/finance-actions";
 import { Revenue } from "@/models/finance";
+import { ManualSale } from "@/models/manual-sale";
+import { UNASSIGNED } from "@/models/manual-sale-values";
 import { Payment } from "@/models/payment";
 import { User } from "@/models/user";
 
 export const metadata = { title: "Finance · Revenue" };
 
-type Row = { _id: string; source: "manual" | "sales"; salesPerson: string; date: string; description: string; amount: number };
+type Row = { _id: string; source: "manual" | "sales" | "sale"; salesPerson: string; date: string; description: string; amount: number };
 
 export default async function RevenuePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
@@ -46,6 +48,19 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
           pipeline: [
             { $match: { status: "confirmed", ...dateMatch, ...(person ? { owner: person } : {}) } },
             { $project: { source: { $literal: "sales" }, salesPerson: "$owner", date: 1, description: { $concat: ["$clientName", " · ", "$type"] }, amount: 1 } },
+          ],
+        },
+      },
+      {
+        // Money collected on confirmed manual sales: one row per receipt (an older sale with no receipt lines counts once, on the sale date).
+        $unionWith: {
+          coll: ManualSale.collection.name,
+          pipeline: [
+            { $match: { status: "confirmed", ...(person ? { owner: person } : {}) } },
+            { $project: { saleCode: 1, business: 1, owner: 1, lines: { $cond: [{ $gt: [{ $size: { $ifNull: ["$payments", []] } }, 0] }, "$payments", [{ amount: "$collected", date: "$date" }]] } } },
+            { $unwind: "$lines" },
+            ...(dateMatch.date ? [{ $match: { "lines.date": dateMatch.date } }] : []),
+            { $project: { source: { $literal: "sale" }, salesPerson: { $cond: [{ $eq: ["$owner", UNASSIGNED] }, "", "$owner"] }, date: "$lines.date", description: { $concat: ["$business", " · ", { $ifNull: ["$lines.receiptNo", "$saleCode"] }] }, amount: "$lines.amount" } },
           ],
         },
       },
@@ -75,12 +90,12 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
       <PeriodFilter basePath="/finance/revenue" year={year} month={month} range={{ from, to }} extras={[
         { name: "person", label: "All sales persons", value: person, options: people.map((p) => ({ value: p.username, label: `${p.username} · ${p.fullName || ""}` })) },
       ]} />
-      {rows.length === 0 ? <EmptyState title="No revenue for this period" text="Approved sales payments and other revenue appear here." /> : (
+      {rows.length === 0 ? <EmptyState title="No revenue for this period" text="Approved sales payments, manual sales and other revenue appear here." /> : (
         <DataTable
           rows={rows}
-          rowKey={(r) => String(r._id)}
+          rowKey={(r) => `${r.source}-${r._id}-${r.description}-${r.date}`}
           columns={[
-            { header: "Source", cell: (r) => <Badge tone={r.source === "sales" ? "brand" : "info"}>{r.source === "sales" ? "Sales payment" : "Other"}</Badge> },
+            { header: "Source", cell: (r) => <Badge tone={r.source === "manual" ? "info" : "brand"}>{r.source === "sales" ? "Sales payment" : r.source === "sale" ? "Manual sale" : "Other"}</Badge> },
             { header: "Sales person", cell: (r) => (r.salesPerson ? `${nameOf.get(r.salesPerson) ?? ""} · ${r.salesPerson}` : "—") },
             { header: "Date", cell: (r) => r.date },
             { header: "Description", cell: (r) => r.description },

@@ -34,8 +34,8 @@ export async function createProjectAction(_: ActionState, formData: FormData): P
   if (input.dueDate && !dateIsAllowed(input.dueDate)) return fail("Due date cannot be before today.");
 
   await connectDb();
-  const client = await Client.findOne({ code: input.clientCode }).select("name service workType").lean();
-  if (!client) return fail("Choose a client.");
+  const client = await Client.findOne({ code: input.clientCode }).select("name service workType ownOnly").lean();
+  if (!client || (client.ownOnly && user.role !== "superadmin")) return fail("Choose a client.");
   const bought = workTypeOfClient(client);
   if (input.type === "both" ? bought !== "both" : bought !== "both" && bought !== input.type) return { ok: false, message: "This client did not buy that kind of work.", errors: { type: `${client.name} bought ${bought} work, so choose a matching project type.` } };
   if (await Project.exists({ clientCode: input.clientCode, type: input.type, archived: false })) return { ok: false, message: "This client already has that project.", errors: { clientCode: "An active project of this type already exists for this client." } };

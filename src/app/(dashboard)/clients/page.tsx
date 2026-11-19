@@ -31,7 +31,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const rx = q ? new RegExp(escapeRegex(q), "i") : null;
   await connectDb();
   const byProject = rx ? await Project.find({ name: rx }).distinct("clientCode") : [];
-  const filter = { $and: [clientWorkFilter(user.role), ...(rx ? [{ $or: [{ name: rx }, { code: rx }, { phone: rx }, { email: rx }, { service: rx }, { address: rx }, { contactName: rx }, { assignedPerson: rx }, { notes: rx }, { code: { $in: byProject } }] }] : []), ...(own ? [{ salesOwner: user.username }] : [])] };
+  const filter = { $and: [clientWorkFilter(user.role), ...(rx ? [{ $or: [{ name: rx }, { code: rx }, { phone: rx }, { email: rx }, { service: rx }, { address: rx }, { contactName: rx }, { assignedPerson: rx }, { notes: rx }, { code: { $in: byProject } }] }] : []), ...(own ? [{ salesOwner: user.username }] : [{ ownOnly: { $ne: true } }])] };
 
   await backfillWorkTypes();
   await connectDb();

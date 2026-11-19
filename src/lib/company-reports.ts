@@ -4,6 +4,7 @@ import { ISSUE_PRIORITIES, ISSUE_STATUSES } from "@/lib/issues";
 import { PRIORITY, PROJECT_STATUS, TASK_STATUS } from "@/lib/projects";
 import { Client } from "@/models/client";
 import { Expense, Payroll, Revenue } from "@/models/finance";
+import { manualCollections } from "@/lib/manual-sales";
 import { Department, Employee, Leave } from "@/models/hrms";
 import { Issue } from "@/models/issue";
 import { Lead } from "@/models/lead";
@@ -207,15 +208,20 @@ export async function buildReport(id: ReportId, from: string, to: string): Promi
   if (id === "profit" || id === "expenses" || id === "payroll") {
     const monthly = (field: string) => [{ $match: { date: r } }, { $group: { _id: { $substr: ["$date", 0, 7] }, n: { $sum: field === "pay" ? { $add: ["$base", "$commission"] } : `$${field}` } } }];
     if (id === "profit") {
-      const [sales, manual, spent, paid] = await Promise.all([
+      const [sales, manual, spent, paid, manualSold] = await Promise.all([
         Payment.aggregate<Totals>([{ $match: { status: "confirmed", date: r } }, ...monthly("amount").slice(1)]),
         Revenue.aggregate<Totals>(monthly("amount")),
         Expense.aggregate<Totals>(monthly("amount")),
         Payroll.aggregate<Totals>([{ $match: { status: "Paid", date: r } }, ...monthly("pay").slice(1)]),
+        manualCollections(r),
       ]);
       const categories = await Expense.aggregate<Totals>([{ $match: { date: r } }, { $group: { _id: "$category", n: { $sum: "$amount" } } }, { $sort: { n: -1 } }]);
       const by = (rows: Totals[]) => new Map(rows.map((x) => [String(x._id), x.n]));
-      const [s, m, e, p] = [by(sales), by(manual), by(spent), by(paid)];
+      const [s0, m, e, p] = [by(sales), by(manual), by(spent), by(paid)];
+      const ms = by(manualSold);
+      // Money collected on manual sales counts as sales income, month by month.
+      const s = new Map(s0);
+      for (const [k, v] of ms) s.set(k, (s.get(k) ?? 0) + v);
       const months = [...new Set([...s.keys(), ...m.keys(), ...e.keys(), ...p.keys()])].sort();
       const total = (map: Map<string, number>) => [...map.values()].reduce((a, b) => a + b, 0);
       const income = total(s) + total(m);
@@ -224,7 +230,7 @@ export async function buildReport(id: ReportId, from: string, to: string): Promi
         title,
         summary: [["Income", formatMoney(income)], ["Expenses", formatMoney(total(e))], ["Salaries paid", formatMoney(total(p))], ["Net profit", formatMoney(income - out)]],
         sections: [
-          { heading: "Income", columns: ["Source", "Amount"], rows: [["Project payments", formatMoney(total(s))], ["Manual revenue entries", formatMoney(total(m))]] },
+          { heading: "Income", columns: ["Source", "Amount"], rows: [["Project payments", formatMoney(total(s0))], ["Manual sales collected", formatMoney(total(ms))], ["Manual revenue entries", formatMoney(total(m))]] },
           { heading: "Month by month", columns: ["Month", "Income", "Expenses", "Salaries", "Net"], rows: months.map((k) => { const inc = (s.get(k) ?? 0) + (m.get(k) ?? 0); return [k, formatMoney(inc), formatMoney(e.get(k) ?? 0), formatMoney(p.get(k) ?? 0), formatMoney(inc - (e.get(k) ?? 0) - (p.get(k) ?? 0))]; }), note: months.length ? undefined : "Nothing in this period." },
           { heading: "Expenses by category", columns: ["Category", "Amount"], rows: categories.map((c) => [String(c._id), formatMoney(c.n)]), note: categories.length ? undefined : "Nothing in this period." },
         ],

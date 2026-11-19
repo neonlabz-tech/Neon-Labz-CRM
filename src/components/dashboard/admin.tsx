@@ -9,6 +9,7 @@ import { formatMoney } from "@/lib/money";
 import { param, type SearchParams } from "@/lib/pagination";
 import { PROJECT_STATUS, PROJECT_TYPES } from "@/lib/projects";
 import { Client } from "@/models/client";
+import { manualCollected } from "@/lib/manual-sales";
 import { Department, Employee } from "@/models/hrms";
 import { Expense, Payroll, Revenue } from "@/models/finance";
 import { Invoice } from "@/models/invoice";
@@ -54,11 +55,12 @@ export async function AdminDashboard({ username, sp }: { username: string; sp: S
 async function Company({ prefix, note, year, month }: { prefix: string; note: string; year: string; month: string }) {
   const dates = dateIn(prefix, "date");
   const projectMatch = { archived: false, ...dateIn(prefix, "startDate", "dueDate") };
-  const [history, waiting, salesRevenue, manualRevenue, status, ownCount, people, packages, perDepartment, departments, stages, payroll, expenses, revenues, confirmed, expenseKinds, salary, requests] = await Promise.all([
+  const [history, waiting, salesRevenue, manualRevenue, manualSales, status, ownCount, people, packages, perDepartment, departments, stages, payroll, expenses, revenues, confirmed, expenseKinds, salary, requests] = await Promise.all([
     Project.countDocuments({ archived: true }),
     Invoice.find({ approval: "pending" }).select("receiptNo clientName salesOwner amount type date").sort({ createdAt: -1 }).limit(10).lean(),
     Payment.aggregate<Row>(sum("amount", { status: "confirmed", ...dates })),
     Revenue.aggregate<Row>(sum("amount", dates)),
+    manualCollected((dates as { date?: unknown }).date),
     Project.aggregate<Row>(group("status", projectMatch)),
     Project.countDocuments({ ...projectMatch, owner: { $regex: "^SA_" } }),
     Employee.countDocuments({ status: "Active" }),
@@ -78,12 +80,12 @@ async function Company({ prefix, note, year, month }: { prefix: string; note: st
   const projectTotal = Object.values(projectCounts).reduce((a, b) => a + b, 0);
   const departmentCounts = toCounts(perDepartment);
   const expenseRows = [...expenseKinds.map((row) => [String(row._id), row.n] as [string, number]), ...(total(salary) ? [["Salary", total(salary)] as [string, number]] : [])];
-  const revenueTotal = total(salesRevenue) + total(manualRevenue);
+  const revenueTotal = total(salesRevenue) + total(manualRevenue) + manualSales;
   const [company, commission] = await Promise.all([companyGoals(), commissionPayable(prefix)]);
 
   return (
     <>
-      <CompanyTarget collected={total(salesRevenue)} target={periodTarget(company.monthlyTarget, year, month)} note={note} />
+      <CompanyTarget collected={total(salesRevenue) + manualSales} target={periodTarget(company.monthlyTarget, year, month)} note={note} />
       <Kpis items={[
         { label: "Revenue", value: formatMoney(revenueTotal), hint: note },
         { label: "Projects", value: projectTotal },
