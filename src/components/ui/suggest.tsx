@@ -23,10 +23,11 @@ function Label({ htmlFor, required, children }: { htmlFor: string; required?: bo
   );
 }
 
-function List({ id, items, active, onPick }: { id: string; items: string[]; active: number; onPick: (value: string) => void }) {
+/** `inline` puts the list in the page flow, so a window grows to hold it instead of cutting it off behind its buttons. */
+function List({ id, items, active, onPick, inline }: { id: string; items: string[]; active: number; onPick: (value: string) => void; inline?: boolean }) {
   if (!items.length) return null;
   return (
-    <ul id={id} role="listbox" className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-auto rounded-xl border border-line bg-white p-1 shadow-lg">
+    <ul id={id} role="listbox" className={cn("mt-1 max-h-56 overflow-auto rounded-xl border border-line bg-white p-1 shadow-lg", !inline && "absolute left-0 right-0 top-full z-30")}>
       {items.map((item, index) => (
         <li key={item} role="option" aria-selected={index === active} onMouseDown={(event) => { event.preventDefault(); onPick(item); }} className={cn("cursor-pointer rounded-lg px-3 py-2 text-sm", index === active ? "bg-brand-50 text-brand-700" : "text-ink hover:bg-brand-50")}>
           {item}
@@ -36,15 +37,17 @@ function List({ id, items, active, onPick }: { id: string; items: string[]; acti
   );
 }
 
-const match = (options: string[], query: string, skip: string[] = []) => {
+/** With `all`, an empty box lists every option, so a person can pick without typing. */
+const match = (options: string[], query: string, skip: string[] = [], all = false) => {
   const needle = query.trim().toLowerCase();
-  if (!needle) return [];
-  return options.filter((option) => !skip.includes(option) && option.toLowerCase().includes(needle) && option.toLowerCase() !== needle).slice(0, 8);
+  if (!needle) return all ? options.filter((option) => !skip.includes(option)).slice(0, 60) : [];
+  return options.filter((option) => !skip.includes(option) && option.toLowerCase().includes(needle) && option.toLowerCase() !== needle).slice(0, all ? 60 : 8);
 };
 
 /** A text box that suggests matching names while the person types. Anything can still be typed. */
-export function SuggestField({ label, name, options, required, placeholder, defaultValue, maxLength }: {
+export function SuggestField({ label, name, options, required, placeholder, defaultValue, maxLength, openOnFocus }: {
   label: string; name: string; options: string[]; required?: boolean; placeholder?: string; defaultValue?: string; maxLength?: number;
+  /** Lists every option as soon as the box is clicked. */ openOnFocus?: boolean;
 }) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -52,7 +55,7 @@ export function SuggestField({ label, name, options, required, placeholder, defa
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const error = useFieldError(name);
-  const items = open ? match(options, query) : [];
+  const items = open ? match(options, query, [], Boolean(openOnFocus)) : [];
 
   function pick(value: string) {
     setValue(input.current, value);
@@ -80,6 +83,7 @@ export function SuggestField({ label, name, options, required, placeholder, defa
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${id}-error` : undefined}
           onInput={(event) => { setQuery(event.currentTarget.value); setOpen(true); setActive(0); }}
+          onFocus={() => { if (openOnFocus) { setOpen(true); setActive(0); } }}
           onBlur={() => setOpen(false)}
           onKeyDown={(event) => {
             if (!items.length) return;
@@ -112,7 +116,7 @@ export function MultiSuggestField({ label, name, options, required, placeholder,
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const error = useFieldError(name);
-  const items = open ? match(options, text, chips) : [];
+  const items = open ? match(options, text, chips, true) : [];
 
   /** The form always gets the chips plus whatever is still being typed, so nothing is lost on Save. */
   const send = (list: string[], pending: string) => setValue(joined.current, [...list, pending.trim()].filter(Boolean).join(", "));
@@ -140,7 +144,7 @@ export function MultiSuggestField({ label, name, options, required, placeholder,
       <div className="relative">
         {/* The value the form sends. The person types in the box below; focus (for example from a validation message) is passed on. */}
         <input ref={joined} id={`${id}-value`} data-field name={name} required={required} defaultValue={chips.join(", ")} readOnly tabIndex={-1} aria-hidden="true" onFocus={() => typing.current?.focus()} className="pointer-events-none absolute left-0 top-0 h-0 w-0 opacity-0" />
-        <div onClick={() => typing.current?.focus()} className={cn(box(Boolean(error)), "flex min-h-11 flex-wrap items-center gap-1.5 px-2.5 py-1.5 focus-within:border-brand-500")}>
+        <div onClick={() => { typing.current?.focus(); setOpen(true); }} className={cn(box(Boolean(error)), "flex min-h-11 flex-wrap items-center gap-1.5 px-2.5 py-1.5 focus-within:border-brand-500")}>
           {chips.map((chip, index) => (
             <span key={chip} className="inline-flex max-w-full items-center gap-1 rounded-lg bg-brand-50 py-1 pl-2.5 pr-1 text-xs font-semibold text-brand-700">
               <span className="truncate">{chip}</span>
@@ -161,6 +165,8 @@ export function MultiSuggestField({ label, name, options, required, placeholder,
               if (value.includes(",")) { value.split(",").forEach((part, i, all) => { if (i < all.length - 1) add(part); else setText(part); }); return; }
               setText(value); setOpen(true); setActive(0); send(chips, value);
             }}
+            onFocus={() => { setOpen(true); setActive(0); }}
+            onClick={() => setOpen(true)}
             onBlur={() => { setOpen(false); if (text.trim()) add(text); }}
             onKeyDown={(event) => {
               if (event.key === "Enter") { event.preventDefault(); add(items[active] ?? text); }
@@ -172,7 +178,7 @@ export function MultiSuggestField({ label, name, options, required, placeholder,
             className="h-8 min-w-[8rem] flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-muted/70"
           />
         </div>
-        <List id={`${id}-list`} items={items} active={active} onPick={add} />
+        <List id={`${id}-list`} items={items} active={active} onPick={add} inline />
       </div>
       {error && <p id={`${id}-error`} className="text-xs font-medium text-danger">{error}</p>}
     </div>

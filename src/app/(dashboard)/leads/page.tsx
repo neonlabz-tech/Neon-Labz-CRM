@@ -52,7 +52,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const canDelete = can(user.role, "leads.delete");
 
   // Whose leads, and from when. The four cards count within this; the table adds the stage, source and search on top.
-  const scope: Record<string, unknown> = { ...ownerScope(user), ...(own ? { owner: user.username } : {}) };
+  const scope: Record<string, unknown> = { ...ownerScope(user), ...(own ? { owner: user.username, own: true } : user.role === "superadmin" ? { own: { $ne: true } } : {}) };
   if (admin && range.seller) scope.owner = range.seller;
   const created = dayRange(range);
   if (created) scope.date = created;
@@ -85,7 +85,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const guestChoices = own
     ? await Promise.all([Client.find().select("name").sort({ name: 1 }).limit(500).lean(), Package.find({ status: "active" }).select("name category").sort({ name: 1 }).limit(200).lean()])
     : null;
-  const tabClass = (on: boolean) => `inline-flex h-9 items-center rounded-lg px-4 text-sm font-semibold ${on ? "bg-brand-50 text-brand-700" : "text-muted hover:bg-brand-50"}`;
+  const tabClass = (on: boolean) => `inline-flex h-10 items-center rounded-xl border px-5 text-sm font-semibold transition-colors ${on ? "brand-gradient border-transparent text-white shadow-sm" : "border-line bg-white text-ink hover:border-brand-300 hover:bg-brand-50"}`;
 
   return (
     <>
@@ -94,8 +94,13 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         {canDelete && <ImportLeads today={today} sources={[...LEAD_SOURCES]} services={[...LEAD_SERVICES]} stages={[...LEAD_STAGES]} sellers={sellers.map((u) => ({ username: u.username, label: u.fullName || u.username }))} />}
         {can(user.role, "leads.export") && <a href={`/leads/export?${new URLSearchParams({ q, status, source, period, from: picked.from, to: picked.to, seller: range.seller, ...keepOwn(own) })}`} className="inline-flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-5 text-sm font-semibold hover:bg-brand-50"><Download className="h-4 w-4" />Export CSV</a>}
         {guestChoices && (
-          <DialogButton label="Add guest" title="Add guest client" subtitle="An existing client with a running project" headerIcon={<UserPlus className="h-5 w-5" />} trigger={<span className="inline-flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-5 text-sm font-semibold text-ink hover:bg-brand-50"><UserPlus className="h-4 w-4" />Add guest</span>}>
-            <GuestForm today={today} clients={guestChoices[0].map((c) => c.name)} services={guestChoices[1].map((p) => p.name)} categories={Object.fromEntries(guestChoices[1].map((p) => [p.name.toLowerCase(), p.category]))} />
+          <DialogButton label="Add guest" title="Add guest client" subtitle="An existing client with a running project" headerIcon={<UserPlus className="h-5 w-5" />} trigger={<span className="brand-gradient inline-flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold text-white shadow-sm hover:brightness-110"><UserPlus className="h-4 w-4" />Add guest</span>}>
+            <GuestForm
+              today={today}
+              clients={guestChoices[0].map((c) => c.name)}
+              services={guestChoices[1].map((p) => p.name)}
+              categories={Object.fromEntries(guestChoices[1].map((p) => [p.name.toLowerCase(), p.category]))}
+            />
           </DialogButton>
         )}
         <Link prefetch={false} href={own ? "/leads/new?own=1" : "/leads/new"} className="brand-gradient inline-flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Add lead</Link>

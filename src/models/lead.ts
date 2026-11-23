@@ -21,6 +21,8 @@ const schema = new mongoose.Schema(
   {
     leadId: { type: String, required: true, unique: true },
     owner: { type: String, required: true, index: true },
+    /** True for leads the Super Admin adds under "Own projects"; those never show in the SD (sales team) list. */
+    own: { type: Boolean, default: false },
     date: { type: String, required: true },
     business: { type: String, required: true, trim: true },
     phone: { type: String, default: "" },
@@ -47,4 +49,6 @@ schema.index({ status: 1, next: 1 });
 schema.index({ createdAt: -1 });
 
 export type LeadDoc = InferSchemaType<typeof schema>;
+const cachedLead = mongoose.models.Lead as Model<LeadDoc> | undefined;
+if (process.env.NODE_ENV !== "production" && cachedLead && !cachedLead.schema.path("own")) mongoose.deleteModel("Lead");
 export const Lead: Model<LeadDoc> = (mongoose.models.Lead as Model<LeadDoc>) || mongoose.model<LeadDoc>("Lead", schema);

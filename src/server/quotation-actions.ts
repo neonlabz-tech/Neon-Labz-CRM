@@ -16,6 +16,7 @@ import { reservedAmount } from "@/lib/payments";
 import { resolveIcon } from "@/lib/package-icons";
 import { quotationSchema } from "@/schemas/quotation";
 import { Lead } from "@/models/lead";
+import { Invoice } from "@/models/invoice";
 import { Package } from "@/models/package";
 import { Payment } from "@/models/payment";
 import { Quotation } from "@/models/quotation";
@@ -62,7 +63,7 @@ export async function saveQuotationAction(_: ActionState, formData: FormData): P
   const data = {
     owner: lead.owner, leadId: lead.leadId, clientCode: lead.clientCode, client: lead.business, email: lead.email, phone: lead.phone,
     items, subtotal: figures.subtotal, discountPercent: figures.discountPercent, discount: figures.discount, total: figures.total,
-    terms: input.terms || "As agreed with the client.", date: input.date, valid,
+    terms: richHasText(input.terms) ? cleanRich(input.terms) : "As agreed with the client.", date: input.date, valid,
   };
 
   if (existing) {
@@ -81,4 +82,20 @@ export async function saveQuotationAction(_: ActionState, formData: FormData): P
   await writeAudit(user.username, existing ? "quotation.updated" : "quotation.created", { lead: lead.leadId });
   revalidatePath("/quotations");
   redirect("/quotations");
+}
+
+export async function deleteQuotationAction(id: string): Promise<ActionState> {
+  const user = await requireAction("quotations.manage");
+  await connectDb();
+  const quote = await Quotation.findOne({ _id: id, ...ownerScope(user) }).select("number leadId pdfUrl").lean();
+  if (!quote) return fail("Quotation not found.");
+  if (await Payment.exists({ quoteId: quote._id }) || await Invoice.exists({ quoteId: quote._id })) {
+    return fail("This quotation has payment or receipt records, so it cannot be deleted.");
+  }
+  await Quotation.deleteOne({ _id: quote._id });
+  if (quote.pdfUrl) await deleteFromR2(quote.pdfUrl);
+  await writeAudit(user.username, "quotation.deleted", { lead: quote.leadId, number: quote.number });
+  revalidatePath("/quotations");
+  revalidatePath("/leads");
+  return done("Quotation deleted.");
 }

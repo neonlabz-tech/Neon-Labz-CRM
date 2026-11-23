@@ -11,6 +11,8 @@ const schema = new mongoose.Schema(
     price: { type: Number, required: true, min: 0 },
     duration: { type: String, enum: DURATIONS, default: "Per project" },
     features: { type: [String], default: [] },
+    included: { type: String, default: "" },
+    summary: { type: String, default: "" },
     cover: { type: String, default: "" },
     icon: { type: String, default: "" },
     status: { type: String, enum: ["active", "archived"], default: "active" },
@@ -21,4 +23,6 @@ schema.index({ status: 1, category: 1, createdAt: -1 });
 schema.index({ name: 1 });
 
 export type PackageDoc = InferSchemaType<typeof schema>;
+const cached = mongoose.models.Package as Model<PackageDoc> | undefined;
+if (process.env.NODE_ENV !== "production" && cached && (!cached.schema.path("included") || !cached.schema.path("summary"))) mongoose.deleteModel("Package");
 export const Package: Model<PackageDoc> = (mongoose.models.Package as Model<PackageDoc>) || mongoose.model<PackageDoc>("Package", schema);

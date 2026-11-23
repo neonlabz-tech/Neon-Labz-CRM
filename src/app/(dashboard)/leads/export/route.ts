@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const params = Object.fromEntries(request.nextUrl.searchParams);
   const { range } = periodRange(params, todayISO());
   const own = user.role === "superadmin" && params.own === "1";
-  const filter: Record<string, unknown> = { ...ownerScope(user), ...(own ? { owner: user.username } : {}) };
+  const filter: Record<string, unknown> = { ...ownerScope(user), ...(own ? { owner: user.username, own: true } : user.role === "superadmin" ? { own: { $ne: true } } : {}) };
   if (LEAD_STAGES.includes(params.status as never)) filter.status = params.status;
   if (LEAD_SOURCES.includes(params.source as never)) filter.source = params.source;
   if (user.role === "superadmin" && !own && range.seller) filter.owner = range.seller;

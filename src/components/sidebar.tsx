@@ -7,7 +7,7 @@ import { useState } from "react";
 import { BadgeCheck, Bell, Briefcase, CalendarRange, ClipboardList, Activity, Bug, ChartColumn, Gauge, HandCoins, UsersRound, FolderKanban, ListChecks, ChevronsLeft, FileText, LayoutDashboard, LogOut, Menu, Package, PhoneCall, Search, ShieldCheck, UserCog, UserRound, Wallet, X } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { logoutAction } from "@/server/auth-actions";
-import type { IconName, NavGroup } from "@/lib/nav";
+import { activeItem, type IconName, type NavGroup } from "@/lib/nav";
 
 const ICONS = {
   dashboard: LayoutDashboard, users: UserCog, audit: ShieldCheck, account: UserRound, leads: PhoneCall, quotes: FileText,
@@ -19,7 +19,9 @@ type Props = { groups: NavGroup[]; name: string; roleLabel: string; collapsedByD
 export function Sidebar({ groups, name, roleLabel, collapsedByDefault, bell }: Props) {
   const background = "bg-gradient-to-b from-[#1c2142] via-[#4b1fa8] to-[#1c2142]";
   const pathname = usePathname();
-  const own = useSearchParams().get("own") === "1";
+  const params = useSearchParams();
+  const own = params.get("own") === "1";
+  const current = activeItem(groups, pathname, own, params.get("pm") ?? "");
   const [collapsed, setCollapsed] = useState(collapsedByDefault);
   const [open, setOpen] = useState(false);
 
@@ -48,7 +50,7 @@ export function Sidebar({ groups, name, roleLabel, collapsedByDefault, bell }: P
               {group.items.map((item) => {
                 const Icon = ICONS[item.icon];
                 
-                const active = item.own === own && item.match.some((m) => pathname === m || pathname.startsWith(`${m}/`));
+                const active = current === item;
                 return (
                   <li key={item.href}>
                     <Link

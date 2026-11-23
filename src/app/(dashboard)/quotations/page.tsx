@@ -16,6 +16,7 @@ import { Invoice } from "@/models/invoice";
 import { Lead } from "@/models/lead";
 import { User } from "@/models/user";
 import { Quotation } from "@/models/quotation";
+import { QuotationDeleteButton } from "@/components/quotations/quotation-delete-button";
 
 export const metadata = { title: "Quotations" };
 
@@ -79,6 +80,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
               cell: (c) => (
                 <div className="flex gap-2">
                   {byLead.has(c.leadId) && <PdfLink kind="quotation" id={String(byLead.get(c.leadId)!._id)} />}
+                  {byLead.has(c.leadId) && <QuotationDeleteButton id={String(byLead.get(c.leadId)!._id)} number={byLead.get(c.leadId)!.number} />}
                   <IconLink href={own ? `/quotations/${c.leadId}?own=1` : `/quotations/${c.leadId}`} label={byLead.has(c.leadId) ? "Edit quotation" : "Create quotation"}>{byLead.has(c.leadId) ? <Pencil /> : <Plus />}</IconLink>
                 </div>
               ),

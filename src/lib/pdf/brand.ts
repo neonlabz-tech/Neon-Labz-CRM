@@ -4,6 +4,7 @@ type BrandLine = { name: string; detail: string; qty: string; rate: string; amou
 export type BrandModel = {
   variant: "invoice" | "package"; title: string; subtitle: string; preparedName: string; preparedNote: string;
   documentId: string; documentDate: string; documentMeta: string; lines: BrandLine[]; scopeItems: string[]; featureItems: string[];
+  scopeHtml?: string; termsHtml?: string;
   investment: number; investmentLabel: string; investmentNote: string; pricingNote: string; pageLabel: string; approved: boolean;
 };
 
@@ -83,6 +84,8 @@ export function renderBrandDocument({
   lines = [],
   scopeItems = [],
   featureItems = [],
+  scopeHtml = "",
+  termsHtml = "",
   investment = 0,
   investmentLabel = "Package investment",
   investmentNote = "Payment terms to be confirmed",
@@ -130,6 +133,7 @@ export function renderBrandDocument({
   .section { margin: 0 0 22px; }
   .section-head { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 10px; color: #873CFF; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
   table { width: 100%; border-collapse: collapse; }
+  thead { display: table-header-group; }
   th, td { text-align: left; vertical-align: top; padding: 12px 14px; }
   th { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
   td:nth-child(2), td:nth-child(3), td:nth-child(4), th:nth-child(2), th:nth-child(3), th:nth-child(4) { text-align: right; white-space: nowrap; }
@@ -137,6 +141,17 @@ export function renderBrandDocument({
   td span { display: block; margin-top: 3px; color: #6B7280; }
   .empty-line { color: #9CA3AF; }
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 28px; }
+  .rich-scope { color: #1F2937; font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+  .rich-scope p, .rich-scope div { margin: 0 0 5px; }
+  .rich-scope ul, .rich-scope ol { margin: 4px 0; padding-left: 22px; list-style: disc; }
+  .rich-scope ol { list-style: decimal; }
+  .rich-scope li { padding: 0; }
+  .rich-scope li::before { content: none; }
+  .rich-scope table { margin: 8px 0; border-collapse: collapse; }
+  .rich-scope th, .rich-scope td { border: 1px solid #D9DCEA; padding: 6px 8px; text-align: left; white-space: normal; }
+  .rich-scope th { background: #F3F5FA; }
+  .terms { color: #374151; font-size: 11px; line-height: 1.55; }
+  .terms p, .terms div { margin: 0 0 4px; }
   ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
   li { position: relative; padding: 2px 0 2px 22px; color: #1F2937; }
   li::before { content: ""; position: absolute; left: 0; top: 8px; width: 8px; height: 8px; background: #873CFF; border-radius: 50%; }
@@ -171,7 +186,9 @@ export function renderBrandDocument({
   .is-package li::before { left: 10px; top: 13px; }
   @media print {
     html, body { background: #fff !important; }
-    .sheet { margin: 0 !important; box-shadow: none !important; width: 210mm; min-height: 0 !important; }
+    .sheet { margin: 0 !important; box-shadow: none !important; width: 210mm; min-height: 0 !important; overflow: visible; }
+    table { break-inside: auto; }
+    tr { break-inside: avoid; break-after: auto; }
   }
 </style></head>
 <body>
@@ -212,7 +229,10 @@ export function renderBrandDocument({
           <tbody>${lineRows(lines)}</tbody>
         </table>
       </section>
-      ${scope.length || features.length ? `      <section class="section">
+      ${scopeHtml ? `      <section class="section">
+        <div class="section-head"><span>02 / Approved package scope</span></div>
+        <div class="rich-scope">${scopeHtml}</div>
+      </section>` : scope.length || features.length ? `      <section class="section">
         <div class="section-head">
           <span>02 / Approved package scope</span>
           <span>${featureCount} included features</span>
@@ -222,6 +242,7 @@ export function renderBrandDocument({
           <div>${bulletList(features)}</div>
         </div>
       </section>` : ""}
+      ${termsHtml ? `<section class="section terms"><div class="section-head"><span>Payment terms</span></div><div class="rich-scope">${termsHtml}</div></section>` : ""}
       <div class="bottom">
         <div class="note">
           <div class="label">Pricing note</div>

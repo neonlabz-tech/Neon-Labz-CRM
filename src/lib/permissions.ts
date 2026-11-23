@@ -32,6 +32,7 @@ export const ACTIONS = {
   "packages.manage": ["superadmin"],
   "packages.view": ["superadmin", "sales"],
   "own.view": ["superadmin"],
+  "special.manage": ["superadmin"],
   "payments.record": ["sales", "superadmin"],
   "sales.targets": ["superadmin"],
   "targets.own": ["sales"],

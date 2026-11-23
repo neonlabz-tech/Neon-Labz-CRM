@@ -10,12 +10,13 @@ export type LeadDefaults = {
   source?: string; service?: string; status?: string; notes?: string;
 };
 
-export function LeadForm({ defaults, uid = "" }: { defaults: LeadDefaults; /** Makes the field ids unique when several lead forms are on one page (the edit window of every row). */ uid?: string }) {
+export function LeadForm({ defaults, uid = "", own = false }: { defaults: LeadDefaults; /** The Super Admin is adding this lead from "Own projects". */ own?: boolean; /** Makes the field ids unique when several lead forms are on one page (the edit window of every row). */ uid?: string }) {
   const editing = Boolean(defaults.id);
   const id = (name: string) => (uid ? `${name}-${uid}` : name);
   return (
     <ActionForm action={saveLeadAction} submit={editing ? "Save lead" : "Add lead"} toastOnSuccess={editing} className="space-y-6">
       {defaults.id && <input type="hidden" name="id" value={defaults.id} />}
+      {own && !defaults.id && <input type="hidden" name="own" value="1" />}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Business or customer name" name="business" id={id("business")} defaultValue={defaults.business} required />
         <Field label="Lead date" value={formatDay(defaults.date)} readOnly tabIndex={-1} className="cursor-not-allowed bg-canvas text-muted" aria-label="Lead date (set automatically)" />

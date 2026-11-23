@@ -17,6 +17,7 @@ import { manualSaleSchema, salePaymentSchema } from "@/schemas/manual-sale";
 import { Client } from "@/models/client";
 import { MANUAL_SALE_STATUSES, ManualSale, UNASSIGNED } from "@/models/manual-sale";
 import { Project } from "@/models/project";
+import { Package } from "@/models/package";
 import { User } from "@/models/user";
 import type { ActionState } from "@/types";
 
@@ -72,9 +73,14 @@ export async function saveManualSaleAction(_: ActionState, formData: FormData): 
   if (!parsed.success) return invalid(parsed.error);
   const { id, guest: guestFlag, ...fields } = parsed.data;
   const guest = guestFlag === "1";
-  // "Add guest" records an existing client: no value, nothing collected, no salesperson, confirmed straight away.
-  const data = guest ? { ...fields, owner: UNASSIGNED, amount: 0, collected: 0, status: "confirmed" as const } : fields;
   await connectDb();
+  // A guest's service is one or more package names picked from the list or typed. An id from an older form is turned into the package's name.
+  const single = guest && isId(fields.service) ? await Package.findOne({ _id: fields.service, status: "active" }).select("name").lean() : null;
+  if (guest && isId(fields.service) && !single) {
+    return { ok: false, message: "Choose an active package.", errors: { service: "Choose an active package from the list." } };
+  }
+  // "Add guest" records an existing client: no value, nothing collected, no salesperson, confirmed straight away.
+  const data = guest ? { ...fields, service: single ? single.name : fields.service, owner: UNASSIGNED, amount: 0, collected: 0, status: "confirmed" as const } : fields;
   if (data.owner !== UNASSIGNED && !(await User.exists({ username: data.owner, role: "sales", active: true }))) return { ok: false, message: "Choose a salesperson.", errors: { owner: "Choose a salesperson from the list." } };
 
   // A guest is a client who is not in the system yet; a name that is already a client is refused so nobody is merged or switched by mistake.

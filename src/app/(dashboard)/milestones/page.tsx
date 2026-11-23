@@ -12,7 +12,7 @@ import { can } from "@/lib/permissions";
 import { connectDb } from "@/lib/db";
 import { keepOwn, ownView } from "@/lib/own";
 import { escapeRegex, pageOf, limitOf, skipOf, param, type SearchParams } from "@/lib/pagination";
-import { accountFilter, activeEmployees, marketingUsernames, visibleProjectFilter } from "@/lib/project-access";
+import { accountFilter, activeEmployees, isMarketingAccount, marketingUsernames, visibleProjectFilter } from "@/lib/project-access";
 import { canManageDepartment, MILESTONE_STATUS, type Department, type ProjectType } from "@/lib/projects";
 import { formatDay } from "@/lib/utils";
 import { Milestone } from "@/models/milestone";
@@ -48,7 +48,7 @@ export default async function MilestonesPage({ searchParams }: { searchParams: P
     // On a project that has both parts, a Project Manager sees the software milestones and Marketing sees the marketing ones.
     ...(user.role === "pm" ? [{ department: "software" }] : user.role === "marketing" ? [{ department: "marketing" }] : []),
     // The Super Admin looking at one account sees that account's part of each project.
-    ...(admin && pm ? [{ department: pm.startsWith("MD_") ? "marketing" : "software" }] : []),
+    ...(admin && pm ? [{ department: isMarketingAccount(pm) ? "marketing" : "software" }] : []),
     ...(status in MILESTONE_STATUS ? [{ status }] : []),
     ...(assigned ? [{ assignees: assigned }] : []),
     ...(rx ? [{ $or: [{ title: rx }, { projectId: { $in: matchedProjects } }] }] : []),

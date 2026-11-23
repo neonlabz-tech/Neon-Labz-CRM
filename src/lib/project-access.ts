@@ -68,7 +68,15 @@ export async function visibleProjectFilter(user: Pick<SessionUser, "role" | "use
  * marketing part, because Marketing works on those even when the Project Manager started them.
  */
 export function accountFilter(account: string): Record<string, unknown> {
+  // The whole PM or MD team: every project that has that team's part.
+  if (account === "PM") return { type: { $in: ["software", "both"] } };
+  if (account === "MD") return { type: { $in: ["marketing", "both"] } };
   return account.startsWith("MD_") ? { $or: [{ owner: account }, { type: "both" }] } : { owner: account };
+}
+
+/** True for the whole Marketing team ("MD") or one Marketing account ("MD_001"). */
+export function isMarketingAccount(account: string): boolean {
+  return account === "MD" || account.startsWith("MD_");
 }
 
 export async function findProject(user: Pick<SessionUser, "role" | "username">, code: string) {

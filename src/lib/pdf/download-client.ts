@@ -211,14 +211,14 @@ export async function downloadPdf(htmlUrl: string, fallbackName: string): Promis
     // Sharper pictures are better to read when zoomed, so draw at up to 3x. A browser cannot make a canvas taller than about 32,000 pixels, so long documents use a smaller scale.
     const scaleFor = (height: number) => Math.max(1.5, Math.min(3, 30000 / height));
     let native = true;
-    try { await inlineImages(doc); } catch (error) { native = false; console.warn("PDF: an image could not be inlined, using the fallback drawing", error); }
+    try { await inlineImages(doc); } catch { native = false; }
     const { default: html2canvas } = await import("html2canvas");
     const fallback = (node: HTMLElement, width: number, height: number) =>
       html2canvas(node, { scale: scaleFor(height), backgroundColor: "#ffffff", useCORS: true, logging: false, scrollX: 0, scrollY: 0, x: 0, y: 0, width, height, windowWidth: width, windowHeight: height });
     // The browser's own renderer first; html2canvas only if that is not possible (an image that cannot be inlined, or a browser that blocks it).
     const draw = async (node: HTMLElement, width: number, height: number) => {
       if (native) {
-        try { return await drawNative(doc, width, height, scaleFor(height)); } catch (error) { native = false; console.warn("PDF: browser drawing failed, using the fallback drawing", error); }
+        try { return await drawNative(doc, width, height, scaleFor(height)); } catch { native = false; }
       }
       return fallback(node, width, height);
     };
@@ -234,7 +234,9 @@ export async function downloadPdf(htmlUrl: string, fallbackName: string): Promis
       }
     } else {
       const sheet = doc.querySelector<HTMLElement>(".sheet") ?? doc.body;
-      Object.assign(sheet.style, { margin: "0", boxShadow: "none", minHeight: "0" });
+      // A sheet laid out as a column (the quotation) keeps its footer at the bottom of the A4 page, so it stays one full page tall.
+      const pinned = win.getComputedStyle(sheet).display === "flex";
+      Object.assign(sheet.style, { margin: "0", boxShadow: "none", minHeight: pinned ? "1123px" : "0" });
       const width = Math.max(sheet.scrollWidth, sheet.offsetWidth, 794);
       const height = Math.max(sheet.scrollHeight, sheet.offsetHeight);
       frame.style.height = `${height}px`;
