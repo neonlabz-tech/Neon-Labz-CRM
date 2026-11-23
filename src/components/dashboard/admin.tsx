@@ -28,6 +28,7 @@ import { TeamRanking } from "./team-ranking";
 import { companyGoals, periodTarget } from "@/lib/sales-targets";
 import { commissionPayable } from "@/lib/my-sales";
 import { TopPackages } from "./top-packages";
+import { SpecialSummary } from "./special-summary";
 import { Bars, ChartGrid, Kpis, PALETTE, Panel, Ring, slices, Tabs, toCounts, type Slice } from "./widgets";
 
 type Row = { _id: unknown; n: number };
@@ -97,6 +98,7 @@ async function Company({ prefix, note, year, month }: { prefix: string; note: st
         { label: "Password requests", value: requests, hint: "Waiting for you" },
       ]} />
       <TeamRanking year={year} month={month} prefix={prefix} />
+      <SpecialSummary />
       <Panel title="Payment approval" empty={waiting.length ? undefined : "No payment is waiting for approval."}>
         {waiting.length > 0 && (
           <ul className="divide-y divide-line">

@@ -1,5 +1,6 @@
 import { docDate, extractScopeBullets, money } from "./brand";
 import { escapeHtml } from "./letterhead";
+import { cleanRich } from "../rich-text";
 import { iconPaths, svgIcon, UI_ICONS } from "../package-icons";
 
 /** Company details printed on every quotation. Change them here. */
@@ -18,6 +19,9 @@ export type QuotationModel = {
 
 const PURPLE = "#873CFF";
 const ui = (name: keyof typeof UI_ICONS, size = 14, color = PURPLE) => svgIcon(UI_ICONS[name], size, color);
+/** Formatted text (lists, tables, bold, colour) is shown as written. Plain lines keep the old bullet look. */
+const FORMATTED = /<(ul|ol|li|table|h[1-4]|b|strong|i|em|u|span|a|blockquote|code|sub|sup)\b|<[^>]+\sstyle=/i;
+const formatted = (html: string) => FORMATTED.test(html);
 const dotted = (iso: string) => docDate(iso).replace(/\//g, ".");
 
 function requirement(names: string[]): string {
@@ -30,17 +34,22 @@ function requirement(names: string[]): string {
 export function renderQuotationDocument(model: QuotationModel, logo: string, font: string): string {
   const rows = model.items.map((item, index) => {
     const bullets = extractScopeBullets(item.scopeHtml);
+    const reduced = item.price * (1 - model.discountPercent / 100);
+    const unitPrice = model.discountPercent > 0
+      ? `<span class="old-price">${escapeHtml(money(item.price))}</span><strong>${escapeHtml(money(reduced))}</strong>`
+      : escapeHtml(money(item.price));
     return `
         <tr>
           <td class="c">${index + 1}</td>
           <td><div class="svc"><span class="tile">${svgIcon(iconPaths(item.icon), 26, PURPLE, 1.8)}</span><span><strong>${escapeHtml(item.name)}</strong>${item.sub ? `<em>${escapeHtml(item.sub)}</em>` : ""}</span></div></td>
-          <td>${bullets.length ? `<ul class="scope">${bullets.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>` : ""}</td>
+          <td>${formatted(item.scopeHtml) ? `<div class="rt">${cleanRich(item.scopeHtml)}</div>` : bullets.length ? `<ul class="scope">${bullets.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>` : ""}</td>
           <td class="c">1</td>
-          <td class="r">${escapeHtml(money(item.price))}</td>
-          <td class="r b">${escapeHtml(money(item.price))}</td>
+          <td class="r">${unitPrice}</td>
+          <td class="r b">${model.discountPercent > 0 ? escapeHtml(money(reduced)) : escapeHtml(money(item.price))}</td>
         </tr>`;
   }).join("");
-  const notes = model.terms.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const termsFormatted = formatted(model.terms);
+  const notes = termsFormatted ? [] : model.terms.split(/\n+/).map((line) => line.trim()).filter(Boolean);
   const valid = model.valid ? dotted(model.valid) : "";
   const need = requirement(model.items.map((item) => item.name));
   const details = [
@@ -57,7 +66,7 @@ export function renderQuotationDocument(model: QuotationModel, logo: string, fon
   html, body { margin: 0; background: #0b1020; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; box-sizing: border-box; }
   body { font: 12px/1.45 "NL Sans", Arial, sans-serif; color: #1A1F36; }
-  .sheet { width: 210mm; min-height: 297mm; margin: 0 auto 24px; background: #fff; overflow: hidden; position: relative; box-shadow: 0 18px 48px rgba(7,12,43,.28); display: flex; flex-direction: column; }
+  .sheet { display: flex; flex-direction: column; width: 210mm; min-height: 297mm; margin: 0 auto 24px; background: #fff; position: relative; box-shadow: 0 18px 48px rgba(7,12,43,.28); }
   .top { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 26px 40px 18px; }
   .top img { height: 34px; width: auto; display: block; }
   .right { display: flex; align-items: center; gap: 18px; }
@@ -69,7 +78,7 @@ export function renderQuotationDocument(model: QuotationModel, logo: string, fon
   .qmeta b { display: block; margin: 1px 0 7px; font-size: 15px; letter-spacing: -.01em; color: #5B21E6; }
   .qmeta b.plain { color: #0B1026; font-size: 12.5px; margin-bottom: 0; }
   .rule { height: 2px; margin: 0 40px; background: linear-gradient(90deg, #873CFF, #C412FC); border-radius: 2px; opacity: .55; }
-  .pad { padding: 20px 40px 6px; flex: 1; }
+  .pad { padding: 20px 36px 6px; }
   .to { display: grid; grid-template-columns: 1fr 1.15fr; gap: 24px; align-items: center; margin-bottom: 20px; }
   .label { margin: 0 0 8px; color: #5B21E6; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
   dl { margin: 0; display: grid; gap: 4px; }
@@ -83,12 +92,14 @@ export function renderQuotationDocument(model: QuotationModel, logo: string, fon
   .tile svg { display: block; }
   .tbl { border: 1px solid #E5E7EB; border-radius: 10px; overflow: hidden; }
   table { width: 100%; border-collapse: collapse; }
-  th { background: #0B1026; color: #fff; font-size: 11px; font-weight: 700; text-align: left; padding: 10px 12px; border-left: 1px solid rgba(255,255,255,.12); }
+  thead { display: table-header-group; }
+  th { background: #0B1026; color: #fff; font-size: 10.5px; font-weight: 700; text-align: left; padding: 9px; border-left: 1px solid rgba(255,255,255,.12); }
   th:first-child { border-left: 0; }
-  td { padding: 10px 12px; vertical-align: middle; border-top: 1px solid #E5E7EB; border-left: 1px solid #E5E7EB; }
+  td { padding: 8px 9px; vertical-align: middle; border-top: 1px solid #E5E7EB; border-left: 1px solid #E5E7EB; }
   td:first-child { border-left: 0; }
   tr { break-inside: avoid; }
   .c { text-align: center; } .r { text-align: right; white-space: nowrap; } .b { font-weight: 800; color: #0B1026; }
+  .old-price { display: block; color: #9CA3AF; font-size: 10px; text-decoration: line-through; }
   th.c { text-align: center; } th.r { text-align: right; }
   .svc { display: flex; align-items: center; gap: 10px; }
   .svc strong { display: block; font-size: 12.5px; line-height: 1.25; color: #0B1026; }
@@ -96,6 +107,17 @@ export function renderQuotationDocument(model: QuotationModel, logo: string, fon
   .scope { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 11px; color: #374151; }
   .scope li { position: relative; padding-left: 13px; }
   .scope li::before { content: ""; position: absolute; left: 1px; top: 6px; width: 4px; height: 4px; border-radius: 50%; background: #0B1026; }
+  .rt { font-size: 11px; line-height: 1.45; color: #374151; overflow-wrap: anywhere; }
+  .rt p, .rt div { margin: 0 0 3px; }
+  .rt ul { margin: 2px 0 4px; padding-left: 18px; list-style: disc; }
+  .rt ol { margin: 2px 0 4px; padding-left: 18px; list-style: decimal; }
+  .rt li { margin: 1px 0; }
+  .rt h1, .rt h2, .rt h3, .rt h4 { margin: 6px 0 3px; font-size: 12px; font-weight: 800; color: #0B1026; }
+  .rt table { width: 100%; border-collapse: collapse; margin: 4px 0 6px; font-size: 10.5px; table-layout: auto; }
+  .rt th, .rt td { border: 1px solid #D9DCEA; padding: 3px 6px; text-align: left; vertical-align: top; border-left: 1px solid #D9DCEA; }
+  .rt th { background: #F3EFFF; color: #0B1026; font-weight: 700; }
+  .rt tr { break-inside: avoid; }
+  .notes .rt { font-size: 11.5px; }
   .sum { display: grid; grid-template-columns: 1fr 290px; gap: 20px; margin-top: 20px; break-inside: avoid; align-items: start; }
   .valid { display: flex; align-items: center; gap: 12px; background: #F5F2FF; border-radius: 14px; padding: 16px 18px; }
   .valid b { display: block; color: #5B21E6; font-size: 11.5px; letter-spacing: .04em; margin-bottom: 3px; }
@@ -113,15 +135,16 @@ export function renderQuotationDocument(model: QuotationModel, logo: string, fon
   .notes ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 11.5px; color: #374151; }
   .notes li { position: relative; padding-left: 16px; }
   .notes li::before { content: ""; position: absolute; left: 3px; top: 6px; width: 4px; height: 4px; border-radius: 50%; background: #0B1026; }
-  .sign { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin-top: 28px; break-inside: avoid; }
-  .sign div { border-top: 1px solid #9CA3AF; padding-top: 7px; color: #6B7280; font-size: 10.5px; }
-  .sign b { display: block; color: #0B1026; font-size: 11.5px; }
-  .foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 8px 40px 0; padding: 14px 0 22px; border-top: 1px solid #E5E7EB; font-size: 10.5px; color: #374151; }
+  .sheet > :nth-last-child(2) { margin-bottom: 10px; }
+  .foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: auto 40px 0; padding: 14px 0 22px; border-top: 1px solid #E5E7EB; font-size: 10.5px; color: #374151; }
   .foot span { display: flex; align-items: center; gap: 7px; }
   .foot span + span { border-left: 1px solid #D1D5DB; padding-left: 12px; }
   @media print {
     html, body { background: #fff !important; }
-    .sheet { margin: 0 !important; box-shadow: none !important; width: 210mm; min-height: 0 !important; }
+    .sheet { margin: 0 !important; box-shadow: none !important; width: 210mm; min-height: 296mm !important; }
+    .tbl { overflow: visible; }
+    table { break-inside: auto; }
+    tr { break-inside: avoid; break-after: auto; }
   }
 </style></head>
 <body>
@@ -152,7 +175,7 @@ export function renderQuotationDocument(model: QuotationModel, logo: string, fon
       </section>
       <div class="tbl">
         <table>
-          <thead><tr><th class="c" style="width:34px">#</th><th style="width:190px">Service / Product</th><th>Description</th><th class="c" style="width:42px">Qty</th><th class="r" style="width:104px">Unit Price (LKR)</th><th class="r" style="width:104px">Total (LKR)</th></tr></thead>
+          <thead><tr><th class="c" style="width:28px">#</th><th style="width:155px">Service / Product</th><th>Description</th><th class="c" style="width:38px">Qty</th><th class="r" style="width:90px">Unit Price (LKR)</th><th class="r" style="width:90px">Total (LKR)</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -165,8 +188,8 @@ export function renderQuotationDocument(model: QuotationModel, logo: string, fon
           <p class="grand"><span>Total Amount</span><span>LKR ${escapeHtml(money(model.total))}</span></p>
         </div>
       </section>
+      ${termsFormatted ? `<section class="notes"><h3>Notes:</h3><div class="rt">${cleanRich(model.terms)}</div></section>` : ""}
       ${notes.length ? `<section class="notes"><h3>Notes:</h3><ul>${notes.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul></section>` : ""}
-      <div class="sign"><div><b>Accepted by (client)</b>Name, signature and date</div><div><b>For Neon Labz</b>Authorised signature and date</div></div>
     </div>
     <footer class="foot">
       <span>${ui("pin", 15)}${escapeHtml(COMPANY.address)}</span>

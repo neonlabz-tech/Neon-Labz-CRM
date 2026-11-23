@@ -1,12 +1,21 @@
 import { can, type Action, type Role } from "./permissions";
 
 export type IconName = "search" | "dashboard" | "users" | "audit" | "account" | "leads" | "quotes" | "payments" | "approvals" | "clients" | "packages" | "projects" | "work" | "info" | "plans" | "hrms" | "finance" | "issues" | "productivity" | "activity" | "reports" | "mreports" | "notifications";
-type Tab = { href: string; label: string; action?: Action };
+/** `scoped` tabs carry the area's team (PM or MD) so the page shows only that team's work. */
+type Tab = { href: string; label: string; action?: Action; scoped?: boolean };
 /** One sidebar entry. Its tabs are shown at the top of every page inside it. */
-type Area = { title: string; icon: IconName; action?: Action; own?: boolean; tabs: Tab[] };
+type Area = {
+  title: string; icon: IconName; action?: Action; own?: boolean; tabs: Tab[];
+  /** Name shown in the sidebar when it differs from the title for some roles. */
+  label?: (role: Role) => string;
+  /** Only these roles see the area / these roles do not. */
+  roles?: Role[]; hideFor?: Role[];
+  /** The Super Admin's PM and MD areas show one team's work. */
+  scope?: "PM" | "MD";
+};
 type AreaGroup = { title: string; areas: Area[] };
 
-export type NavItem = { href: string; label: string; icon: IconName; own: boolean; match: string[]; tabs: { href: string; label: string }[] };
+export type NavItem = { href: string; label: string; icon: IconName; own: boolean; scope: "PM" | "MD" | ""; match: string[]; tabs: { href: string; label: string; scoped: boolean }[] };
 export type NavGroup = { title: string; items: NavItem[] };
 
 const GROUPS: AreaGroup[] = [
@@ -15,7 +24,7 @@ const GROUPS: AreaGroup[] = [
     title: "Work",
     areas: [
       {
-        title: "Sales", icon: "leads",
+        title: "Sales", icon: "leads", label: (role) => (role === "superadmin" ? "SD" : "Sales"),
         tabs: [
           { href: "/sales-overview", label: "Overview", action: "sales.targets" },
           { href: "/leads", label: "Leads", action: "leads.manage" },
@@ -49,13 +58,36 @@ const GROUPS: AreaGroup[] = [
         ],
       },
       {
-        title: "Projects", icon: "projects",
+        title: "Projects", icon: "projects", hideFor: ["superadmin"],
         tabs: [
           { href: "/projects", label: "Projects", action: "projects.view" },
           { href: "/sprints", label: "Sprints", action: "projects.view" },
           { href: "/milestones", label: "Milestones", action: "projects.view" },
           { href: "/issues", label: "Issues", action: "issues.manage" },
           { href: "/reports", label: "Reports", action: "reports.manage" },
+        ],
+      },
+      {
+        title: "PM", icon: "projects", roles: ["superadmin"], scope: "PM",
+        tabs: [
+          { href: "/projects", label: "Projects", action: "projects.view", scoped: true },
+          { href: "/sprints", label: "Sprints", action: "projects.view", scoped: true },
+          { href: "/milestones", label: "Milestones", action: "projects.view", scoped: true },
+          { href: "/issues", label: "Issues", action: "issues.manage", scoped: true },
+          { href: "/reports", label: "Reports", action: "reports.manage", scoped: true },
+        ],
+      },
+      {
+        title: "MD", icon: "info", roles: ["superadmin"], scope: "MD",
+        tabs: [
+          { href: "/projects", label: "Projects", action: "projects.view", scoped: true },
+          { href: "/sprints", label: "Sprints", action: "projects.view", scoped: true },
+          { href: "/milestones", label: "Milestones", action: "projects.view", scoped: true },
+          { href: "/issues", label: "Issues", action: "issues.manage", scoped: true },
+          { href: "/marketing/info", label: "Client info", action: "marketing.view" },
+          { href: "/marketing/plans", label: "Content plans", action: "marketing.view" },
+          { href: "/marketing/reports", label: "Reports", action: "marketing.view" },
+          { href: "/content-tracker", label: "Content Tracker", action: "content.tab" },
         ],
       },
       {
@@ -67,7 +99,7 @@ const GROUPS: AreaGroup[] = [
         ],
       },
       {
-        title: "Marketing", icon: "info",
+        title: "Marketing", icon: "info", hideFor: ["superadmin"],
         tabs: [
           { href: "/marketing/info", label: "Client info", action: "marketing.view" },
           { href: "/marketing/plans", label: "Content plans", action: "marketing.view" },
@@ -79,6 +111,16 @@ const GROUPS: AreaGroup[] = [
       {
         title: "Content Tracker", icon: "plans", action: "content.sidebar",
         tabs: [{ href: "/content-tracker", label: "Content Tracker", action: "content.track" }],
+      },
+      {
+        title: "Special Clients", icon: "users", action: "special.manage",
+        tabs: [
+          { href: "/special-clients", label: "Clients" },
+          { href: "/special-clients/quotations", label: "Quotations" },
+          { href: "/special-clients/proposals", label: "Proposals" },
+          { href: "/special-clients/srs", label: "SRS documents" },
+          { href: "/special-clients/info", label: "Client info" },
+        ],
       },
     ],
   },
@@ -106,11 +148,25 @@ export function navFor(role: Role): NavGroup[] {
   return GROUPS.map((group) => ({
     title: group.title,
     items: group.areas.flatMap((area): NavItem[] => {
-      const tabs = area.tabs.filter((tab) => !tab.action || can(role, tab.action)).map(({ href, label }) => ({ href, label }));
+      if ((area.roles && !area.roles.includes(role)) || area.hideFor?.includes(role)) return [];
+      const scope = area.scope ?? "";
+      const tabs = area.tabs.filter((tab) => !tab.action || can(role, tab.action)).map(({ href, label, scoped }) => ({ href, label, scoped: Boolean(scoped) }));
       const first = tabs[0];
       if (!first || (area.action && !can(role, area.action))) return [];
       const own = Boolean(area.own);
-      return [{ href: `${first.href}${own ? "?own=1" : ""}`, label: area.title, icon: area.icon, own, match: tabs.map((t) => t.href), tabs: tabs.length > 1 ? tabs : [] }];
+      const query = own ? "?own=1" : scope && first.scoped ? `?pm=${scope}` : "";
+      return [{ href: `${first.href}${query}`, label: area.label?.(role) ?? area.title, icon: area.icon, own, scope, match: tabs.map((t) => t.href), tabs: tabs.length > 1 ? tabs : [] }];
     }),
   })).filter((group) => group.items.length > 0);
+}
+
+/**
+ * The sidebar entry the person is in. The PM and MD areas of the Super Admin share some pages (Projects, Sprints, ...),
+ * so the team in the address (pm=PM or pm=MD, or an account of that team) tells them apart.
+ */
+export function activeItem(groups: NavGroup[], path: string, own: boolean, pm: string): NavItem | undefined {
+  const hits = groups.flatMap((g) => g.items).filter((i) => i.own === own && i.match.some((m) => path === m || path.startsWith(`${m}/`)));
+  if (hits.length < 2) return hits[0];
+  const scope = pm === "MD" || pm.startsWith("MD_") ? "MD" : pm === "PM" || pm.startsWith("PM_") ? "PM" : "";
+  return hits.find((i) => i.scope === scope) ?? hits[0];
 }

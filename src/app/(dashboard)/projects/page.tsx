@@ -16,7 +16,7 @@ import { keepOwn, ownView } from "@/lib/own";
 import { requireAction } from "@/lib/auth";
 import { connectDb } from "@/lib/db";
 import { escapeRegex, pageOf, limitOf, skipOf, param, type SearchParams } from "@/lib/pagination";
-import { accountFilter, activeEmployees, marketingUsernames, visibleProjectFilter } from "@/lib/project-access";
+import { accountFilter, activeEmployees, isMarketingAccount, marketingUsernames, visibleProjectFilter } from "@/lib/project-access";
 import { canEditProjectShell, canManageDepartment, PROJECT_STATUS, PROJECT_TYPES, partsLine, statusFor, type Department, type ProjectType } from "@/lib/projects";
 import { formatDay } from "@/lib/utils";
 import { Lead } from "@/models/lead";
@@ -41,7 +41,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const admin = user.role === "superadmin";
   const viewOnly = admin && !own;
   // The Super Admin looking at one account sees the projects the way that account does: its own part, status and progress.
-  const lens: typeof user.role = admin && pm && !own ? (pm.startsWith("MD_") ? "marketing" : "pm") : user.role;
+  const lens: typeof user.role = admin && pm && !own ? (isMarketingAccount(pm) ? "marketing" : "pm") : user.role;
   const scope = [await visibleProjectFilter(user), ...(own ? [{ owner: user.username }] : []), ...(pm ? [accountFilter(pm)] : [])];
 
   const filter: Record<string, unknown>[] = [...scope, { archived: showArchived }];

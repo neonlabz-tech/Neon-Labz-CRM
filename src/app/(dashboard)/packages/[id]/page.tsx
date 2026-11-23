@@ -18,7 +18,7 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
   return (
     <>
       <PageHeader title="Edit package" subtitle={pkg.name} />
-      <Card><PackageForm defaults={{ id, name: pkg.name, category: pkg.category, description: pkg.description, price: pkg.price, duration: pkg.duration, features: pkg.features, status: pkg.status, cover: pkg.cover, icon: pkg.icon }} /></Card>
+      <Card><PackageForm defaults={{ id, name: pkg.name, category: pkg.category, description: pkg.description, price: pkg.price, duration: pkg.duration, features: pkg.features, included: pkg.included, summary: pkg.summary, status: pkg.status, cover: pkg.cover, icon: pkg.icon }} /></Card>
     </>
   );
 }

@@ -90,6 +90,9 @@
   & ol { list-style: decimal; padding-left: 1.4rem; margin: 0.25rem 0; }
   & h1, & h2, & h3, & h4 { font-weight: 700; margin: 0.35rem 0; }
   & h1 { font-size: 1.25rem; } & h2 { font-size: 1.1rem; }
+  & table { border-collapse: collapse; width: 100%; margin: 0.4rem 0; table-layout: auto; }
+  & th, & td { border: 1px solid #d9dcea; padding: 0.3rem 0.5rem; text-align: left; vertical-align: top; }
+  & th { background: #f3efff; font-weight: 700; }
 }
 
 /* A protected window that was clicked outside of: a short side-to-side shake. */

@@ -36,7 +36,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
 
   await connectDb();
   const [rows, total] = await Promise.all([
-    Package.find(filter).select("name category description price duration features status cover icon").sort({ createdAt: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
+    Package.find(filter).select("name category description price duration features included status cover icon").sort({ createdAt: -1 }).skip(skipOf(page)).limit(limitOf(page)).lean(),
     Package.countDocuments(filter),
   ]);
 
@@ -76,7 +76,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
               cell: (r: (typeof rows)[number]) => (
                 <div className="flex gap-2">
                   <DialogButton label="View full package" title={r.name} subtitle={r.category} icon={<Eye />}>
-                    <PackageView pkg={{ name: r.name, category: r.category, description: r.description, price: r.price, duration: r.duration, features: r.features, status: r.status, icon: r.icon }} />
+                    <PackageView pkg={{ name: r.name, category: r.category, description: r.description, price: r.price, duration: r.duration, features: r.features, included: r.included, status: r.status, icon: r.icon }} />
                   </DialogButton>
                   {manage && <PackageRowActions id={String(r._id)} />}
                 </div>

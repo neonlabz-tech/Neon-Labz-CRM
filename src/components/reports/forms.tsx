@@ -1,5 +1,6 @@
 import { Field, SelectField, TextareaField } from "@/components/ui/field";
 import { ActionForm } from "@/components/ui/form";
+import type { ActionState } from "@/types";
 import { saveSrsAction, saveVideoAction } from "@/server/report-actions";
 
 type Project = { code: string; name: string };
@@ -13,11 +14,14 @@ export const ProjectSelect = ({ projects, value }: { projects: Project[]; value:
 
 export type SrsValues = { id?: string; projectCode: string; title: string; preparedFor: string; date: string; introduction: string; functional: string; nonFunctional: string; assumptions: string };
 
-export function SrsForm({ values, projects }: { values: SrsValues; projects: Project[] }) {
+type SaveAction = (state: ActionState, data: FormData) => Promise<ActionState>;
+
+/** `action` and `picker` let another area (Special Clients) use the same form for its own save and its own "who is it for" choice. */
+export function SrsForm({ values, projects = [], action = saveSrsAction, picker }: { values: SrsValues; projects?: Project[]; action?: SaveAction; picker?: React.ReactNode }) {
   return (
-    <ActionForm action={saveSrsAction} submit="Save document" toastOnSuccess={false} className="grid gap-4 sm:grid-cols-2">
+    <ActionForm action={action} submit="Save document" toastOnSuccess={false} className="grid gap-4 sm:grid-cols-2">
       <Hidden id={values.id} />
-      <div className="sm:col-span-2"><ProjectSelect projects={projects} value={values.projectCode} /></div>
+      <div className="sm:col-span-2">{picker ?? <ProjectSelect projects={projects} value={values.projectCode} />}</div>
       <Field label="Document title" required name="title" defaultValue={values.title} maxLength={200} />
       <Field label="Prepared for" name="preparedFor" defaultValue={values.preparedFor} maxLength={300} />
       <Field label="Date" name="date" type="date" defaultValue={values.date} />

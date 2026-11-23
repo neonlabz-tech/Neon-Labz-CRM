@@ -10,6 +10,8 @@ import { renderPdf } from "@/lib/pdf/render";
 import { buildReport, isReportId, REPORT_TYPES } from "@/lib/company-reports";
 import { companyReportHtml } from "@/lib/pdf/company-report";
 import { open } from "@/lib/secrets";
+import { packageScopeHtml } from "@/lib/rich-text";
+import { deleteFromR2 } from "@/lib/r2";
 import type { R2Folder } from "@/lib/r2";
 import { Client } from "@/models/client";
 import { Invoice } from "@/models/invoice";
@@ -23,10 +25,14 @@ import { Payment } from "@/models/payment";
 import { Project } from "@/models/project";
 import { Quotation } from "@/models/quotation";
 import { Proposal, Srs } from "@/models/report";
+import { SpecialClient, SpecialDoc } from "@/models/special";
+import { specialQuotationHtml } from "@/lib/pdf/special-doc";
 
 export const maxDuration = 60;
 
 type User = { username: string; role: Role };
+const QUOTATION_PDF_VERSION = 6;
+const RECEIPT_PDF_VERSION = 2;
 /** `stored` documents are kept in R2 and reused; the others are made on demand and never saved. */
 type Source = { name: string; html: () => Promise<string>; stored?: { folder: R2Folder; url: string; save: (url: string) => Promise<unknown> } };
 type Loader = (id: string, user: User) => Promise<Source | null>;
@@ -45,7 +51,14 @@ const LOADERS: Record<string, Loader> = {
     return {
       name: quote.number,
       html: async () => quotationHtml({ ...quote, address: lead?.address ?? "" }, await quotationAssets()),
-      stored: { folder: "quotations", url: quote.pdfUrl, save: (pdfUrl) => Quotation.updateOne({ _id: id }, { pdfUrl }) },
+      stored: {
+        folder: "quotations",
+        url: quote.pdfVersion === QUOTATION_PDF_VERSION ? quote.pdfUrl : "",
+        save: async (pdfUrl) => {
+          await Quotation.updateOne({ _id: id }, { pdfUrl, pdfVersion: QUOTATION_PDF_VERSION });
+          if (quote.pdfUrl && quote.pdfUrl !== pdfUrl) await deleteFromR2(quote.pdfUrl);
+        },
+      },
     };
   },
   async receipt(id, user) {
@@ -59,7 +72,14 @@ const LOADERS: Record<string, Loader> = {
     return {
       name: receipt.receiptNo,
       html: async () => receiptHtml(receipt, quote, await invoiceAssets(), paid),
-      stored: { folder: "receipts", url: receipt.pdfUrl, save: (pdfUrl) => Invoice.updateOne({ _id: id }, { pdfUrl }) },
+      stored: {
+        folder: "receipts",
+        url: receipt.pdfVersion === RECEIPT_PDF_VERSION ? receipt.pdfUrl : "",
+        save: async (pdfUrl) => {
+          await Invoice.updateOne({ _id: id }, { pdfUrl, pdfVersion: RECEIPT_PDF_VERSION });
+          if (receipt.pdfUrl && receipt.pdfUrl !== pdfUrl) await deleteFromR2(receipt.pdfUrl);
+        },
+      },
     };
   },
   async srs(id, user) {
@@ -137,11 +157,43 @@ const LOADERS: Record<string, Loader> = {
     const title = REPORT_TYPES.find((t) => t.id === type)!.title;
     return { name: `${title}-${from}-${to}`, html: async () => companyReportHtml(await buildReport(type, from, to), `${from} to ${to}`, await letterheadAssets()) };
   },
+  /** Special Clients documents (Super Admin only). The id is the document's id; they are made on demand and not stored. */
+  async spquote(id, user) {
+    if (!can(user.role, "special.manage")) return null;
+    const quote = await SpecialDoc.findOne({ _id: id, kind: "quotation" }).lean();
+    if (!quote) return null;
+    const client = isId(quote.clientId) ? await SpecialClient.findById(quote.clientId).select("email phone address").lean() : null;
+    return {
+      name: quote.number,
+      html: async () => specialQuotationHtml({ ...quote, email: client?.email ?? "", phone: client?.phone ?? "", address: client?.address ?? "", items: quote.items.map((i) => ({ name: i.name, price: i.price, scope: i.scope ?? "" })) }, await quotationAssets()),
+    };
+  },
+  /** A proposal or an SRS document of a special client, made with the same layouts as the project reports. */
+  async spdoc(id, user) {
+    if (!can(user.role, "special.manage")) return null;
+    const doc = await SpecialDoc.findOne({ _id: id, kind: { $in: ["proposal", "srs"] } }).lean();
+    if (!doc) return null;
+    const data = (doc.data ?? {}) as Record<string, unknown>;
+    if (doc.kind === "srs") return { name: `${doc.number}-${doc.title}`, html: async () => srsHtml({ ...data, title: doc.title, date: doc.date }, doc.clientName, await letterheadAssets()) };
+    const proposal = { stack: [], brand: [], packageStats: [], budget: [], ...data, title: doc.title, date: doc.date } as unknown as Parameters<typeof proposalHtml>[0];
+    return { name: `${doc.number}-${doc.title}`, html: async () => proposalHtml(proposal, await letterheadAssets()) };
+  },
+  /** The client info of a special client (the id is the client's id), with the saved passwords opened for the Super Admin. */
+  async spinfo(id, user) {
+    if (!can(user.role, "special.manage")) return null;
+    const client = await SpecialClient.findById(id).select("code name info infoSaved").lean();
+    if (!client || !client.infoSaved) return null;
+    const info = (client.info ?? {}) as Record<string, unknown> & { social?: Record<string, { password?: string }> };
+    const social = Object.fromEntries(Object.entries(info.social ?? {}).map(([key, value]) => [key, { ...value, password: open(value.password ?? "") }]));
+    const brand = String(info.brandName || client.name);
+    return { name: `${brand}-profile`, html: async () => infoHtml({ ...info, brandName: brand, social } as unknown as InfoInput, client.code, await quotationAssets()) };
+  },
   async package(id, user) {
     if (!can(user.role, "packages.view")) return null;
-    const item = await Package.findById(id).lean();
+    const item = await Package.findById(id).select("name category description price duration features included").lean();
     if (!item) return null;
-    return { name: item.name, html: async () => packageHtml({ name: item.name, service: item.category, period: item.duration, price: item.price, scope: item.features.join("\n") }, await invoiceAssets()) };
+    const scope = packageScopeHtml(item.description ?? "", item.features ?? [], item.included ?? "");
+    return { name: item.name, html: async () => packageHtml({ name: item.name, service: item.category, period: item.duration, price: item.price, scope }, await invoiceAssets()) };
   },
 };
 

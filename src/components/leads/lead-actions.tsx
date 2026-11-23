@@ -11,7 +11,7 @@ export function LeadRowActions({ id, canDelete, canQuote = false, children }: { 
     <div className="flex gap-2">
       {children}
       {canQuote && <IconLink href={`/quotations/${id}`} label="Quotation"><FileText /></IconLink>}
-      {canDelete && <ConfirmButton icon={<Trash2 className="h-4 w-4" />} label="Delete" title={`Delete ${id}?`} text="This removes the lead and its call history. It cannot be undone." confirmLabel="Delete" run={() => deleteLeadAction(id)} />}
+      {canDelete && <ConfirmButton icon={<Trash2 className="h-4 w-4" />} label="Delete" title={`Delete ${id}?`} text="This removes the lead and its call history. If it has a quotation, that quotation and its saved PDF are removed too. Leads with payment or receipt records are kept." confirmLabel="Delete" run={() => deleteLeadAction(id)} />}
     </div>
   );
 }

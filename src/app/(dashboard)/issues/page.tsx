@@ -40,7 +40,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Promi
   // A project manager or marketing head sees their own issues and the ones the Super Admin sent to their team.
   // Picking an account as the Super Admin shows that person's own issues plus the ones sent to their team.
   const who = user.role === "superadmin" ? account : user.username;
-  const team = user.role === "pm" || who.startsWith("PM_") ? "pm" : user.role === "marketing" || who.startsWith("MD_") ? "marketing" : "";
+  const team = user.role === "pm" || who === "PM" || who.startsWith("PM_") ? "pm" : user.role === "marketing" || who === "MD" || who.startsWith("MD_") ? "marketing" : "";
   // Issues of a project that is in History stay hidden until the project is moved back to active.
   const history = await historyProjectCodes();
   const mine: Record<string, unknown> = {

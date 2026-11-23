@@ -14,8 +14,10 @@ import { ownerScope } from "@/lib/permissions";
 import { EMAIL_ERROR, PHONE_ERROR, PHONE_TAKEN, formatPhone, phoneDigits, validEmail, validSriLankanPhone } from "@/lib/phone";
 import { callEntrySchema, leadSchema } from "@/schemas/lead";
 import { Lead } from "@/models/lead";
+import { Invoice } from "@/models/invoice";
 import { Payment } from "@/models/payment";
 import { Quotation } from "@/models/quotation";
+import { deleteFromR2 } from "@/lib/r2";
 import { User } from "@/models/user";
 import type { ActionState } from "@/types";
 
@@ -74,6 +76,8 @@ export async function saveLeadAction(_: ActionState, formData: FormData): Promis
     next: call?.next || existing?.next || "",
     ...(call ? { latestFollowUpAt: new Date() } : {}),
   };
+  // A lead the Super Admin adds from "Own projects" stays in that area; the SD list is the sales team only.
+  const own = user.role === "superadmin" && formData.get("own") === "1";
   const code = status === "Converted" ? existing?.clientCode || clientCode(await nextSeq("client")) : "";
 
   try {
@@ -82,7 +86,7 @@ export async function saveLeadAction(_: ActionState, formData: FormData): Promis
       if (call) existing.calls.push(call);
       await existing.save();
     } else {
-      const created = await Lead.create({ ...base, leadId: leadId(await nextSeq("lead")), owner: user.username, clientCode: code, calls: call ? [call] : [] });
+      const created = await Lead.create({ ...base, leadId: leadId(await nextSeq("lead")), owner: user.username, own, clientCode: code, calls: call ? [call] : [] });
       await writeAudit(user.username, "lead.created", { lead: created.leadId });
     }
   } catch (error) {
@@ -97,7 +101,7 @@ export async function saveLeadAction(_: ActionState, formData: FormData): Promis
     revalidatePath(`/leads/${existing.leadId}`);
     return done("Lead saved.");
   }
-  redirect(user.role === "superadmin" ? "/leads?own=1" : "/leads");
+  redirect(own ? "/leads?own=1" : "/leads");
 }
 
 export async function deleteLeadAction(id: string): Promise<ActionState> {
@@ -105,12 +109,21 @@ export async function deleteLeadAction(id: string): Promise<ActionState> {
   await connectDb();
   const lead = await Lead.findOne({ leadId: id, ...ownerScope(user) }).select("leadId").lean();
   if (!lead) return fail("Lead not found.");
-  if (await Quotation.exists({ leadId: id })) return fail("This lead already has a quotation. Remove the quotation first.");
-  if (await Payment.exists({ leadId: id })) return fail("This lead already has a payment. Cancel the payment first.");
+  const quote = await Quotation.findOne({ leadId: id }).select("_id number pdfUrl").lean();
+  if (quote && (await Payment.exists({ quoteId: quote._id }) || await Invoice.exists({ quoteId: quote._id }))) {
+    return fail("This lead has payment or receipt records, so it cannot be deleted. Its quotation is kept.");
+  }
+  if (quote) {
+    await Quotation.deleteOne({ _id: quote._id });
+    if (quote.pdfUrl) await deleteFromR2(quote.pdfUrl);
+  } else if (await Payment.exists({ leadId: id })) {
+    return fail("This lead has payment records, so it cannot be deleted.");
+  }
   await Lead.deleteOne({ leadId: id });
   await writeAudit(user.username, "lead.deleted", { lead: id });
   revalidatePath("/leads");
-  return done("Lead deleted.");
+  revalidatePath("/quotations");
+  return done(quote ? "Lead and its quotation deleted." : "Lead deleted.");
 }
 
 /** The Super Admin hands a lead (and its quotation) to another active salesperson. */
@@ -202,14 +215,29 @@ export async function deleteLeadsAction(ids: string[]): Promise<ActionState> {
   if (!wanted.length) return fail("Choose at least one lead.");
   await connectDb();
   const mine = (await Lead.find({ leadId: { $in: wanted }, ...ownerScope(user) }).select("leadId").lean()).map((l) => l.leadId);
-  const [quoted, paid] = await Promise.all([Quotation.distinct("leadId", { leadId: { $in: mine } }), Payment.distinct("leadId", { leadId: { $in: mine } })]);
-  const locked = new Set([...quoted, ...paid]);
+  const quotes = await Quotation.find({ leadId: { $in: mine } }).select("leadId _id pdfUrl").lean();
+  const quoteIds = quotes.map((quote) => quote._id);
+  const [paid, invoiced] = await Promise.all([
+    Payment.distinct("leadId", { leadId: { $in: mine } }),
+    quoteIds.length ? Invoice.distinct("quoteId", { quoteId: { $in: quoteIds } }) : Promise.resolve([]),
+  ]);
+  const protectedQuotes = new Set(invoiced.map(String));
+  const locked = new Set([
+    ...paid,
+    ...quotes.filter((quote) => protectedQuotes.has(String(quote._id))).map((quote) => quote.leadId),
+  ]);
   const removable = mine.filter((id) => !locked.has(id));
-  if (removable.length) await Lead.deleteMany({ leadId: { $in: removable } });
+  const removableQuotes = quotes.filter((quote) => removable.includes(quote.leadId));
+  if (removable.length) {
+    await Quotation.deleteMany({ leadId: { $in: removable } });
+    await Lead.deleteMany({ leadId: { $in: removable } });
+    await Promise.all(removableQuotes.map((quote) => quote.pdfUrl ? deleteFromR2(quote.pdfUrl) : Promise.resolve()));
+  }
   await writeAudit(user.username, "lead.deleted.bulk", { count: removable.length });
   revalidatePath("/leads");
-  if (!removable.length) return fail("None of these leads can be deleted. They already have a quotation or payment.");
-  return done(`Deleted ${removable.length} lead${removable.length === 1 ? "" : "s"}.${locked.size ? ` ${locked.size} kept because they have a quotation or payment.` : ""}`);
+  revalidatePath("/quotations");
+  if (!removable.length) return fail("None of these leads can be deleted. They have payment or receipt records.");
+  return done(`Deleted ${removable.length} lead${removable.length === 1 ? "" : "s"}${removableQuotes.length ? ` and ${removableQuotes.length} quotation${removableQuotes.length === 1 ? "" : "s"}` : ""}.${locked.size ? ` ${locked.size} kept because they have payment or receipt records.` : ""}`);
 }
 
 /** Live check while a phone number is typed: is it already on another lead? */

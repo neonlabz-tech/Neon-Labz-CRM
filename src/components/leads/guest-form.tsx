@@ -8,6 +8,7 @@ import { saveManualSaleAction } from "@/server/manual-sale-actions";
 /**
  * An existing client (an old project) the Super Admin brings in. It saves as a confirmed manual sale of no value,
  * so the client, the "Goes to" rules and the notifications all work the same way as for any manual sale.
+ * Several packages can be picked (the list opens on click); a name that is not in the list is added by typing it and pressing Enter.
  */
 export function GuestForm({ today, clients, services, categories }: { today: string; clients: string[]; services: string[]; categories: Record<string, string> }) {
   return (
@@ -19,7 +20,7 @@ export function GuestForm({ today, clients, services, categories }: { today: str
       <input type="hidden" name="status" value="confirmed" />
       <SuggestField label="Client" required name="business" options={clients} placeholder="Type a client name" maxLength={160} />
       <Field label="Old project date" required name="date" type="date" defaultValue={today} max={today} />
-      <MultiSuggestField label="Service or package" required name="service" options={services} placeholder="Type to find a package, or write your own" />
+      <MultiSuggestField label="Service or package" required name="service" options={services} placeholder="Click to pick packages, or type your own and press Enter" />
       <GoesToField defaultValue="project" defaultOwner={UNASSIGNED} categories={categories} />
       <p className="text-xs text-muted sm:col-span-2">Use this for a client who already has a running project. It does not count as a lead or as revenue. After saving, open Clients and start the project; dates in the past are allowed for a guest.</p>
     </ActionForm>

@@ -21,6 +21,7 @@ const schema = new mongoose.Schema(
     approvedBy: { type: String, default: "" },
     approvedAt: { type: Date, default: null },
     pdfUrl: { type: String, default: "" },
+    pdfVersion: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

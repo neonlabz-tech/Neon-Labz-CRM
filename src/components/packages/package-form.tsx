@@ -1,12 +1,14 @@
 // import { FileField } from "@/components/ui/file-field";
 import { IconField } from "@/components/packages/icon-picker";
 // import Image from "next/image";
-import { Field, SelectField, TextareaField } from "@/components/ui/field";
+import { Field, SelectField } from "@/components/ui/field";
+import { RichText } from "@/components/ui/rich-text";
 import { ActionForm } from "@/components/ui/form";
+import { linesToRich, richToHtml } from "@/lib/rich-text";
 import { CATEGORIES, DURATIONS } from "@/models/package";
 import { savePackageAction } from "@/server/package-actions";
 
-export type PackageDefaults = { id?: string; name?: string; category?: string; description?: string; price?: number; duration?: string; features?: string[]; status?: string; cover?: string; icon?: string };
+export type PackageDefaults = { id?: string; name?: string; category?: string; description?: string; price?: number; duration?: string; features?: string[]; included?: string; summary?: string; status?: string; cover?: string; icon?: string };
 
 export function PackageForm({ defaults = {} }: { defaults?: PackageDefaults }) {
   return (
@@ -20,8 +22,9 @@ export function PackageForm({ defaults = {} }: { defaults?: PackageDefaults }) {
       <SelectField label="Duration" required name="duration" defaultValue={defaults.duration ?? DURATIONS[0]}>
         {DURATIONS.map((d) => <option key={d}>{d}</option>)}
       </SelectField>
-      <div className="sm:col-span-2"><TextareaField label="Description" name="description" defaultValue={defaults.description} /></div>
-      <div className="sm:col-span-2"><TextareaField label="What is included (one item per line)" name="features" rows={5} defaultValue={defaults.features?.join("\n")} /></div>
+      <div className="sm:col-span-2"><RichText label="Description" name="description" defaultValue={richToHtml(defaults.description ?? "")} placeholder="What this package covers" minHeight="9rem" /></div>
+      <div className="sm:col-span-2"><RichText label="What is included" name="included" defaultValue={defaults.included ? richToHtml(defaults.included) : linesToRich(defaults.features)} placeholder="One item per bullet, or a table" minHeight="8rem" /></div>
+      <div className="sm:col-span-2"><RichText label="Quote summary (shown in quotations)" name="summary" defaultValue={defaults.summary ? richToHtml(defaults.summary) : ""} placeholder="The 4–6 key points the client needs to see. Leave empty to use the full details." minHeight="7rem" /></div>
       <div className="sm:col-span-2"><IconField defaultValue={defaults.icon ?? ""} /></div>
       {/* Cover image is switched off for now: the quotation uses the icon above.
       <div className="space-y-2 sm:col-span-2">

@@ -1,5 +1,6 @@
 "use server";
 
+import { cleanRich, richHasText, richToLines } from "@/lib/rich-text";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAction } from "@/lib/auth";
@@ -16,7 +17,10 @@ export async function savePackageAction(_: ActionState, formData: FormData): Pro
   const user = await requireAction("packages.manage");
   const parsed = packageSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return invalid(parsed.error);
-  const { id, ...data } = parsed.data;
+  const { id, ...rest } = parsed.data;
+  const included = cleanRich(rest.included);
+  // `features` stays a plain list made from the editor, so the package sheet and older screens keep working.
+  const data = { ...rest, description: cleanRich(rest.description), summary: cleanRich(rest.summary), included, features: richHasText(included) ? richToLines(included) : [] };
 
   await connectDb();
   const existing = id ? await Package.findById(id).select("cover").lean() : null;
@@ -42,6 +46,30 @@ export async function setPackageStatusAction(id: string, status: "active" | "arc
   await writeAudit(user.username, status === "archived" ? "package.archived" : "package.restored", { id });
   revalidatePath("/packages");
   return done(status === "archived" ? "Package archived." : "Package is active again.");
+}
+
+export async function duplicatePackageAction(id: string): Promise<ActionState> {
+  const user = await requireAction("packages.manage");
+  await connectDb();
+  const source = await Package.findById(id).select("name category description price duration features included summary icon").lean();
+  if (!source) return fail("That package was not found.");
+  const name = `Copy of ${source.name}`.slice(0, 120);
+  const copy = await Package.create({
+    name,
+    category: source.category,
+    description: source.description,
+    price: source.price,
+    duration: source.duration,
+    features: source.features,
+    included: source.included,
+    summary: source.summary,
+    icon: source.icon,
+    cover: "",
+    status: "active",
+  });
+  await writeAudit(user.username, "package.duplicated", { id: String(copy._id), source: id });
+  revalidatePath("/packages");
+  return done(`${name} created. Open it to edit the details.`);
 }
 
 export async function deletePackageAction(id: string): Promise<ActionState> {

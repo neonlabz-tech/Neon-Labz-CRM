@@ -2,9 +2,10 @@ import { Check, Clock } from "lucide-react";
 import { PackageIconSvg } from "@/components/packages/icon-picker";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
+import { richHasText, richToHtml } from "@/lib/rich-text";
 import { resolveIcon } from "@/lib/package-icons";
 
-type Pkg = { name: string; category: string; description?: string; price: number; duration: string; features: string[]; status: string; icon?: string | null };
+type Pkg = { name: string; category: string; description?: string; price: number; duration: string; features: string[]; included?: string; status: string; icon?: string | null };
 
 /** What a salesperson sees when they open a package: the price first, then what the client gets. */
 export function PackageView({ pkg }: { pkg: Pkg }) {
@@ -32,11 +33,13 @@ export function PackageView({ pkg }: { pkg: Pkg }) {
         </div>
       </div>
 
-      {pkg.description && <p className="text-sm leading-relaxed text-muted">{pkg.description}</p>}
+      {pkg.description && <div className="rich max-h-40 overflow-auto text-sm leading-relaxed text-muted" dangerouslySetInnerHTML={{ __html: richToHtml(pkg.description) }} />}
 
       <div>
         <h3 className="mb-2 text-sm font-semibold">What the client gets</h3>
-        {pkg.features.length === 0 ? (
+        {pkg.included && richHasText(pkg.included) ? (
+          <div className="rich rounded-xl border border-line bg-white px-3 py-2 text-sm" dangerouslySetInnerHTML={{ __html: richToHtml(pkg.included) }} />
+        ) : pkg.features.length === 0 ? (
           <p className="text-sm text-muted">No items listed.</p>
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2">

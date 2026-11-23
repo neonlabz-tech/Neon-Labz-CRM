@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Field, TextareaField } from "@/components/ui/field";
 import { ActionForm } from "@/components/ui/form";
 import { saveProposalAction } from "@/server/report-actions";
+import type { ActionState } from "@/types";
 import { ProjectSelect } from "./forms";
 
 type Row = Record<string, string>;
@@ -35,7 +36,10 @@ function RowsEditor({ name, columns, rows, onChange, blank, addLabel }: {
   );
 }
 
-export function ProposalForm({ values, lists, projects }: { values: ProposalValues; lists: Partial<Lists>; projects: { code: string; name: string }[] }) {
+type SaveAction = (state: ActionState, data: FormData) => Promise<ActionState>;
+
+/** `action` and `picker` let another area (Special Clients) use the same form for its own save and its own "who is it for" choice. */
+export function ProposalForm({ values, lists, projects = [], action = saveProposalAction, picker }: { values: ProposalValues; lists: Partial<Lists>; projects?: { code: string; name: string }[]; action?: SaveAction; picker?: React.ReactNode }) {
   const [stack, setStack] = useState<Row[]>(lists.stack?.length ? lists.stack : LAYERS.map((layer) => ({ layer, technology: "", purpose: "" })));
   const [brand, setBrand] = useState<Row[]>(lists.brand?.length ? lists.brand : [{ title: "", text: "" }, { title: "", text: "" }, { title: "", text: "" }]);
   const [stats, setStats] = useState<Row[]>(lists.packageStats?.length ? lists.packageStats : [{ value: "", label: "" }, { value: "", label: "" }, { value: "", label: "" }]);
@@ -45,9 +49,9 @@ export function ProposalForm({ values, lists, projects }: { values: ProposalValu
   const full = "sm:col-span-2";
 
   return (
-    <ActionForm action={saveProposalAction} submit="Save proposal" toastOnSuccess={false} className="space-y-6">
+    <ActionForm action={action} submit="Save proposal" toastOnSuccess={false} className="space-y-6">
       {values.id && <input type="hidden" name="id" value={values.id} />}
-      <ProjectSelect projects={projects} value={v("projectCode")} />
+      {picker ?? <ProjectSelect projects={projects} value={v("projectCode")} />}
 
       <section className="space-y-4"><h3 className="font-semibold">1. Basic details</h3>
         <div className={two}>

@@ -1,4 +1,4 @@
-import { richToHtml } from "@/lib/rich-text";
+import { cleanRich, packageScopeHtml, richToHtml } from "@/lib/rich-text";
 import type { InferSchemaType } from "mongoose";
 import { docDate, extractScopeBullets, money, renderBrandDocument, type BrandModel } from "./brand";
 import { escapeHtml, formatCoverDate, wrapLetterhead } from "./letterhead";
@@ -127,7 +127,9 @@ export function receiptHtml(receipt: ReceiptInput, quote: ReceiptQuote | null, a
     ...splitBullets(items.flatMap((item) => extractScopeBullets(item.scope))),
     investmentLabel: approved ? "Amount paid" : "Amount due",
     investment: receipt.amount,
-    investmentNote: [`Total LKR ${money(total)}`, balance === 0 && approved ? "Balance LKR 0.00 · PAID IN FULL" : `Balance LKR ${money(balance)}`, approved ? (how ? `Approved · ${how}` : "Payment approved") : (quote?.terms || "Payment terms to be confirmed")].join("\n"),
+    investmentNote: [`Total LKR ${money(total)}`, balance === 0 && approved ? "Balance LKR 0.00 · PAID IN FULL" : `Balance LKR ${money(balance)}`, approved ? (how ? `Approved · ${how}` : "Payment approved") : ""].filter(Boolean).join("\n"),
+    scopeHtml: quote?.items.length ? cleanRich(quote.items.map((item) => richToHtml(text(item.scope))).join("")) : "",
+    termsHtml: quote?.terms ? cleanRich(richToHtml(quote.terms)) : "",
     pricingNote: approved ? (balance === 0 ? "Paid in full. Thank you for your business." : "This invoice is issued after payment approval.") : "Scope and pricing are indicative until payment is approved.",
     pageLabel: "01 / 01",
     approved,
@@ -145,7 +147,7 @@ export function packageHtml(item: PackageInput, assets: Assets): string {
     documentDate: docDate(new Date().toISOString().slice(0, 10)),
     documentMeta: item.period || "Per project",
     lines: [{ name: item.name, detail: item.service, qty: "01", rate: money(item.price), amount: money(item.price) }],
-    ...splitBullets(extractScopeBullets(item.scope)),
+    scopeHtml: cleanRich(richToHtml(item.scope)),
     investment: item.price,
     pageLabel: "01 / 01",
   };

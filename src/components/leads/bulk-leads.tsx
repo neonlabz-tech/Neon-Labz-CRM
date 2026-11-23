@@ -33,7 +33,7 @@ export function BulkLeads({ children }: { children: React.ReactNode }) {
             variant="danger"
             label={`Delete (${selected.length})`}
             title={`Delete ${selected.length} lead${selected.length === 1 ? "" : "s"}?`}
-            text="This cannot be undone. A lead that already has a quotation or payment is kept."
+            text="This cannot be undone. A lead's quotation is removed with it; leads with payment or receipt records are kept."
             confirmLabel="Delete"
             run={async () => { const result = await deleteLeadsAction(selected); setSelected([]); return result; }}
           />

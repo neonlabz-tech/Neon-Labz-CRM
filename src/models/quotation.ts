@@ -23,6 +23,7 @@ const schema = new mongoose.Schema(
     date: { type: String, required: true },
     valid: { type: String, default: "" },
     pdfUrl: { type: String, default: "" },
+    pdfVersion: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
