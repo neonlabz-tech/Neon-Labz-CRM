@@ -24,7 +24,7 @@ const GROUPS: AreaGroup[] = [
     title: "Work",
     areas: [
       {
-        title: "Sales", icon: "leads", label: (role) => (role === "superadmin" ? "SD" : "Sales"),
+        title: "Sales", icon: "leads", label: (role) => (role === "superadmin" ? "SD View" : "Sales"),
         tabs: [
           { href: "/sales-overview", label: "Overview", action: "sales.targets" },
           { href: "/leads", label: "Leads", action: "leads.manage" },
@@ -45,19 +45,6 @@ const GROUPS: AreaGroup[] = [
         ],
       },
       {
-        title: "Own projects", icon: "clients", own: true,
-        tabs: [
-          { href: "/projects", label: "Projects", action: "own.view" },
-          { href: "/leads", label: "Leads", action: "own.view" },
-          { href: "/quotations", label: "Quotations", action: "own.view" },
-          { href: "/clients", label: "Clients", action: "own.view" },
-          { href: "/payments", label: "Payments", action: "own.view" },
-          { href: "/marketing/info", label: "Client info", action: "own.view" },
-          { href: "/marketing/plans", label: "Content plans", action: "own.view" },
-          { href: "/marketing/reports", label: "Marketing reports", action: "own.view" },
-        ],
-      },
-      {
         title: "Projects", icon: "projects", hideFor: ["superadmin"],
         tabs: [
           { href: "/projects", label: "Projects", action: "projects.view" },
@@ -68,7 +55,7 @@ const GROUPS: AreaGroup[] = [
         ],
       },
       {
-        title: "PM", icon: "projects", roles: ["superadmin"], scope: "PM",
+        title: "PM View", icon: "projects", roles: ["superadmin"], scope: "PM",
         tabs: [
           { href: "/projects", label: "Projects", action: "projects.view", scoped: true },
           { href: "/sprints", label: "Sprints", action: "projects.view", scoped: true },
@@ -78,7 +65,7 @@ const GROUPS: AreaGroup[] = [
         ],
       },
       {
-        title: "MD", icon: "info", roles: ["superadmin"], scope: "MD",
+        title: "MD View", icon: "info", roles: ["superadmin"], scope: "MD",
         tabs: [
           { href: "/projects", label: "Projects", action: "projects.view", scoped: true },
           { href: "/sprints", label: "Sprints", action: "projects.view", scoped: true },
@@ -88,6 +75,19 @@ const GROUPS: AreaGroup[] = [
           { href: "/marketing/plans", label: "Content plans", action: "marketing.view" },
           { href: "/marketing/reports", label: "Reports", action: "marketing.view" },
           { href: "/content-tracker", label: "Content Tracker", action: "content.tab" },
+        ],
+      },
+      {
+        title: "Own projects", icon: "clients", own: true,
+        tabs: [
+          { href: "/projects", label: "Projects", action: "own.view" },
+          { href: "/leads", label: "Leads", action: "own.view" },
+          { href: "/quotations", label: "Quotations", action: "own.view" },
+          { href: "/clients", label: "Clients", action: "own.view" },
+          { href: "/payments", label: "Payments", action: "own.view" },
+          { href: "/marketing/info", label: "Client info", action: "own.view" },
+          { href: "/marketing/plans", label: "Content plans", action: "own.view" },
+          { href: "/marketing/reports", label: "Marketing reports", action: "own.view" },
         ],
       },
       {

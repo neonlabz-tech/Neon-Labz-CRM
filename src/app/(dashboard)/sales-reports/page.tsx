@@ -10,6 +10,7 @@ import { formatMoney } from "@/lib/money";
 import { param, type SearchParams } from "@/lib/pagination";
 import { dateRange, dayRange, readRange } from "@/lib/sales-range";
 import { Invoice } from "@/models/invoice";
+import { salesLeads } from "@/lib/own";
 import { LEAD_STAGES, Lead } from "@/models/lead";
 import { Quotation } from "@/models/quotation";
 import { User } from "@/models/user";
@@ -17,7 +18,7 @@ import { User } from "@/models/user";
 export const metadata = { title: "Sales reports" };
 
 export default async function SalesReportsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  await requireAction("sales.targets");
+  const user = await requireAction("sales.targets");
   const sp = await searchParams;
   const range = readRange(sp);
   const seller = param(sp, "seller");
@@ -28,7 +29,7 @@ export default async function SalesReportsPage({ searchParams }: { searchParams:
   const [sellers, invoices, leads] = await Promise.all([
     User.find({ role: "sales" }).select("username fullName").sort({ username: 1 }).lean(),
     Invoice.find({ approval: "approved", ...(seller ? { salesOwner: seller } : {}), ...(days ? { date: days } : {}) }).select("quoteId amount").lean(),
-    Lead.find({ ...(seller ? { owner: seller } : {}), ...(created ? { createdAt: created } : {}) }).select("status service owner").lean(),
+    Lead.find({ ...(seller ? { owner: seller } : {}), ...(created ? { createdAt: created } : {}), ...salesLeads(user.username) }).select("status service owner").lean(),
   ]);
 
   const team = sellers.filter((u) => !seller || u.username === seller);

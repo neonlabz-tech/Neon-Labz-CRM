@@ -8,7 +8,7 @@ import { requireAction } from "@/lib/auth";
 import { connectDb } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { escapeRegex, pageOf, limitOf, skipOf, param, type SearchParams } from "@/lib/pagination";
-import { keepOwn, ownView } from "@/lib/own";
+import { keepOwn, ownLeads, ownView, salesLeads } from "@/lib/own";
 import { ownerScope } from "@/lib/permissions";
 import { dateRange, readRange } from "@/lib/sales-range";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +32,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
   // Converted clients, plus any lead that already has a quotation sent.
   const quotedIds = await Quotation.distinct("leadId", { ...ownerScope(user), ...(own ? { owner: user.username } : {}) });
   const and: Record<string, unknown>[] = [{ $or: [{ status: "Converted" }, { leadId: { $in: quotedIds } }] }];
-  const filter: Record<string, unknown> = { $and: and, ...ownerScope(user), ...(own ? { owner: user.username } : {}) };
+  const filter: Record<string, unknown> = { $and: and, ...ownerScope(user), ...(own ? ownLeads(user.username) : user.role === "superadmin" ? salesLeads(user.username) : {}) };
   if (user.role === "superadmin" && !own && range.seller) filter.owner = range.seller;
   const created = dateRange(range);
   if (created) filter.createdAt = created;

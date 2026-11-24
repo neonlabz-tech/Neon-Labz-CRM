@@ -1,6 +1,7 @@
 import { Download, Eye, Pencil } from "lucide-react";
 import Image from "next/image";
 import { ContactsForm } from "@/components/clients/contacts-form";
+import { DeleteClientButton } from "@/components/clients/delete-client-button";
 import { DialogButton } from "@/components/ui/dialog-button";
 import Link from "next/link";
 import { ClientLogo } from "@/components/clients/logo-form";
@@ -106,6 +107,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
               <DialogButton label="Edit client" title={`${r.name} · edit`} icon={<Pencil />} headerIcon={<Pencil className="h-5 w-5" />}>
                 <ContactsForm logo={r.logo ?? ""} canSetWork={user.role === "superadmin" || user.role === "pm"} values={{ code: r.code, name: r.name, service: r.service ?? "", workType: workTypeOfClient(r), contactName: r.contactName, contactTitle: r.contactTitle, assignedPerson: r.assignedPerson, email: r.email, phone: r.phone, address: r.address, notes: r.notes, subContacts: r.subContacts.map((p) => ({ name: p.name ?? "", title: p.title ?? "", email: p.email ?? "", phone: p.phone ?? "" })) }} />
               </DialogButton>
+              {can(user.role, "clients.delete") && <DeleteClientButton code={r.code} name={r.name} />}
               </div>
             ) },
           ]}
