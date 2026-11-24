@@ -80,6 +80,8 @@ export default async function MilestonesPage({ searchParams }: { searchParams: P
       <DialogButton wide label="Milestones and tasks" title={project.name} subtitle={`${project.code} · ${project.clientName} · ${type}`} trigger={trigger}>
         <MilestonesBoard
           projectCode={project.code}
+          projectStart={project.startDate}
+          projectDue={project.dueDate}
           type={type}
           role={user.role}
           username={user.username}
@@ -101,7 +103,7 @@ export default async function MilestonesPage({ searchParams }: { searchParams: P
   const adding = canAdd && param(sp, "new") === "1";
   const query = new URLSearchParams(keep).toString();
   const base = `/milestones${query ? `?${query}` : ""}`;
-  const addable = adding ? await Project.find({ archived: false, ...(await visibleProjectFilter(user)) }).select("code name type").sort({ name: 1 }).limit(300).lean() : [];
+  const addable = adding ? await Project.find({ archived: false, ...(await visibleProjectFilter(user)) }).select("code name type startDate dueDate").sort({ name: 1 }).limit(300).lean() : [];
 
   return (
     <>
@@ -110,7 +112,7 @@ export default async function MilestonesPage({ searchParams }: { searchParams: P
       </PageHeader>
       {adding && (
         <Panel title="Add milestone" subtitle={admin ? "Choose the project and who it goes to." : "Choose the project."} closeHref={base}>
-          <MilestoneAddForm projects={addable.map((p) => ({ code: p.code, name: p.name, type: p.type as ProjectType }))} employees={admin ? mixed : user.role === "marketing" ? marketing : software} admin={admin} department={user.role === "marketing" ? "marketing" : "software"} />
+          <MilestoneAddForm projects={addable.map((p) => ({ code: p.code, name: p.name, type: p.type as ProjectType, startDate: p.startDate ?? "", dueDate: p.dueDate ?? "" }))} employees={admin ? mixed : user.role === "marketing" ? marketing : software} admin={admin} department={user.role === "marketing" ? "marketing" : "software"} />
         </Panel>
       )}
       {admin && <AccessBar own={own} editable pm={pm} path="/milestones" accounts={accounts.map((a) => ({ username: a.username, label: a.fullName ? `${a.fullName} (${a.username})` : a.username }))} />}

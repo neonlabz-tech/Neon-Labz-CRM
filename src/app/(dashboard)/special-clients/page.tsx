@@ -29,7 +29,7 @@ export default async function SpecialClientsPage({ searchParams }: { searchParam
 
   return (
     <>
-      <PageHeader title="Special Clients" subtitle="Influencers, schools and other clients you handle directly. They stay separate from sales, projects and revenue.">
+      <PageHeader title="Special Clients" subtitle="Influencers, schools and other clients you handle directly. Use Send to give one to the PM or MD, who then start the project from Clients.">
         <AddClientButton />
       </PageHeader>
       <SearchBar q={q} placeholder="Search by name, code, contact or email" filters={[{ name: "type", label: "All types", value: type, options: SPECIAL_TYPES.map((t) => ({ value: t, label: t })) }]} />
@@ -44,6 +44,7 @@ export default async function SpecialClientsPage({ searchParams }: { searchParam
             { header: "Phone", cell: (r) => r.phone || "—" },
             { header: "Email", cell: (r) => r.email || "—" },
             { header: "Documents", cell: (r) => docs.get(String(r._id)) ?? 0 },
+            { header: "Sent to", cell: (r) => ((r.sentTo ?? []).length ? <span className="flex gap-1">{(r.sentTo ?? []).map((role) => <Badge key={role} tone="info">{role === "pm" ? "PM" : "MD"}</Badge>)}</span> : "—") },
             { header: "Actions", cell: (r) => <ClientActions client={{ id: String(r._id), name: r.name, type: r.type, contact: r.contact, phone: r.phone, email: r.email, address: r.address }} /> },
           ]}
         />

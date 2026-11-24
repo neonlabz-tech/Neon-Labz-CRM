@@ -13,14 +13,17 @@ import { saveMilestoneAction } from "@/server/project-actions";
  * A project manager adds to the software part and a marketing head to the marketing part.
  */
 export function MilestoneAddForm({ projects, employees, admin, department }: {
-  projects: { code: string; name: string; type: ProjectType }[];
+  projects: { code: string; name: string; type: ProjectType; startDate?: string; dueDate?: string }[];
   employees: { username: string; label: string }[];
   /** The Super Admin chooses the team. A project manager or marketing head adds to their own part. */
   admin: boolean;
   department: "software" | "marketing";
 }) {
   const [code, setCode] = useState("");
-  const type = projects.find((p) => p.code === code)?.type;
+  const chosen = projects.find((p) => p.code === code);
+  const type = chosen?.type;
+  const minDate = chosen?.startDate || undefined;
+  const maxDate = chosen?.dueDate || undefined;
   const options = (Object.keys(AUDIENCES) as Audience[]).filter((a) => !type || audienceFits(type, a));
   return (
     <ActionForm action={saveMilestoneAction} submit="Add milestone" toastOnSuccess className="grid gap-3 sm:grid-cols-2">
@@ -39,8 +42,9 @@ export function MilestoneAddForm({ projects, employees, admin, department }: {
       )}
       <input type="hidden" name="department" value={admin ? "software" : department} />
       <div className="sm:col-span-2"><Field label="Milestone" name="title" required /></div>
-      <Field label="Start" name="startDate" type="date" />
-      <Field label="Due" required name="dueDate" type="date" />
+      <Field label="Start" name="startDate" type="date" min={minDate} max={maxDate} />
+      <Field label="Due" required name="dueDate" type="date" min={minDate} max={maxDate} />
+      {chosen && (minDate || maxDate) && <p className="text-xs text-muted sm:col-span-2">Milestone dates must be within the project: {minDate || "…"} → {maxDate || "…"}.</p>}
       <fieldset className="sm:col-span-2">
         <legend className="mb-1.5 text-sm font-medium">Employees on this milestone</legend>
         {employees.length === 0 ? <p className="text-sm text-muted">No employee logins yet.</p> : (

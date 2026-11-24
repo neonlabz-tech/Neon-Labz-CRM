@@ -88,7 +88,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ code: 
         </div>
       )}
 
-      <MilestonesBoard projectCode={project.code} type={type} role={user.role} username={user.username} milestones={shownMilestones} tasks={tasks} lanes={lanes} software={softwareEmployees} marketing={marketingEmployees} mixed={lanes.length > 1 ? mixedPool : poolFor(lanes[0] ?? "software")} />
+      <MilestonesBoard projectStart={project.startDate} projectDue={project.dueDate} projectCode={project.code} type={type} role={user.role} username={user.username} milestones={shownMilestones} tasks={tasks} lanes={lanes} software={softwareEmployees} marketing={marketingEmployees} mixed={lanes.length > 1 ? mixedPool : poolFor(lanes[0] ?? "software")} />
     </>
   );
 }

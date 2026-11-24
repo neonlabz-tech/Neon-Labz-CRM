@@ -133,6 +133,11 @@ export async function saveMilestoneAction(_: ActionState, formData: FormData): P
 
   const existing = id && isId(id) ? await Milestone.findOne({ _id: id, projectId: project._id }) : null;
   if (id && !existing) return fail("Milestone not found.");
+  // A milestone must fit inside the project's own dates (checked when the date is new or changed).
+  const outside = (d: string) => Boolean(d) && ((project.startDate && d < project.startDate) || (project.dueDate && d > project.dueDate));
+  const projectRange = `${project.startDate || "…"} → ${project.dueDate || "…"}`;
+  if (data.startDate && data.startDate !== existing?.startDate && outside(data.startDate)) return fail(`Start date must be within the project dates (${projectRange}).`);
+  if (data.dueDate !== existing?.dueDate && outside(data.dueDate)) return fail(`Due date must be within the project dates (${projectRange}).`);
   const guestClient = Boolean(await Client.exists({ code: project.clientCode, guest: true }));
   for (const department of departments) {
     if (!teamOf(department).length) {
