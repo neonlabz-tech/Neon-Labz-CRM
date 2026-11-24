@@ -7,7 +7,7 @@ import { ActionForm } from "@/components/ui/form";
 import { PRIORITY, TASK_STATUS } from "@/lib/projects";
 import { saveTaskAction } from "@/server/task-actions";
 
-type MilestoneOption = { id: string; title: string; department: "software" | "marketing"; finished: boolean; assignees: string[] };
+type MilestoneOption = { id: string; title: string; department: "software" | "marketing"; finished: boolean; assignees: string[]; startDate?: string; dueDate?: string };
 type Props = { projectCode: string; milestones: MilestoneOption[]; employees: { username: string; label: string; marketing: boolean }[] };
 
 /** Add a task from the projects list: pick the milestone first, then one of the employees who are on that milestone. */
@@ -38,8 +38,8 @@ export function QuickTaskForm({ projectCode, milestones, employees }: Props) {
         {Object.entries(TASK_STATUS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
       </SelectField>
       <span />
-      <Field label="Start" name="startDate" type="date" />
-      <Field label="Due" name="dueDate" type="date" />
+      <Field label="Start" name="startDate" type="date" min={chosen?.startDate || undefined} max={chosen?.dueDate || undefined} />
+      <Field label="Due" name="dueDate" type="date" min={chosen?.startDate || undefined} max={chosen?.dueDate || undefined} />
       <div className="sm:col-span-2"><RichText label="Details" name="description" placeholder="Add the task breakdown, links or notes." /></div>
     </ActionForm>
   );

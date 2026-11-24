@@ -24,6 +24,8 @@ const schema = new mongoose.Schema(
     ownOnly: { type: Boolean, default: false },
     /** An existing client brought in by the Super Admin (an old project): its dates may be in the past. */
     guest: { type: Boolean, default: false },
+    /** The Special Client (its id) this record was made from when the Super Admin sent it to the PM / MD. */
+    specialId: { type: String, default: "" },
     approvedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }

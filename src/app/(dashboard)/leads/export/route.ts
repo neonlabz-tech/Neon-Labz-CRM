@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { connectDb } from "@/lib/db";
+import { ownLeads, salesLeads } from "@/lib/own";
 import { can, ownerScope } from "@/lib/permissions";
 import { escapeRegex } from "@/lib/pagination";
 import { todayISO } from "@/lib/dates";
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
   const params = Object.fromEntries(request.nextUrl.searchParams);
   const { range } = periodRange(params, todayISO());
   const own = user.role === "superadmin" && params.own === "1";
-  const filter: Record<string, unknown> = { ...ownerScope(user), ...(own ? { owner: user.username, own: true } : user.role === "superadmin" ? { own: { $ne: true } } : {}) };
+  const filter: Record<string, unknown> = { ...ownerScope(user), ...(own ? ownLeads(user.username) : user.role === "superadmin" ? salesLeads(user.username) : {}) };
   if (LEAD_STAGES.includes(params.status as never)) filter.status = params.status;
   if (LEAD_SOURCES.includes(params.source as never)) filter.source = params.source;
   if (user.role === "superadmin" && !own && range.seller) filter.owner = range.seller;

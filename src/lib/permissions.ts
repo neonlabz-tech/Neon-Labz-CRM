@@ -45,6 +45,7 @@ export const ACTIONS = {
   "payments.approve": ["superadmin"],
   "quotations.manage": ["superadmin", "sales"],
   "clients.view": ["superadmin", "pm", "marketing"],
+  "clients.delete": ["superadmin"],
   "projects.view": ["superadmin", "pm", "marketing"],
   "projects.manage": ["superadmin", "pm", "marketing"],
   "marketing.manage": ["superadmin", "marketing"],

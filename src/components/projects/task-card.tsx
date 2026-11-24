@@ -12,12 +12,12 @@ import { TaskForm, type TaskView } from "./task-form";
 
 type Props = {
   projectCode: string; milestoneId: string; task: TaskView; manager: boolean; mine: boolean; locked: boolean;
-  employees: { username: string; label: string }[];
+  employees: { username: string; label: string }[]; minDate?: string; maxDate?: string;
 };
 
 const tone = { critical: "danger", high: "warning", medium: "info", low: "brand" } as const;
 
-export function TaskCard({ projectCode, milestoneId, task, manager, mine, locked, employees }: Props) {
+export function TaskCard({ projectCode, milestoneId, task, manager, mine, locked, employees, minDate, maxDate }: Props) {
   const [pending, start] = useTransition();
   const toast = useToast();
   const canMove = manager || (mine && !locked && task.status !== "done");
@@ -49,7 +49,7 @@ export function TaskCard({ projectCode, milestoneId, task, manager, mine, locked
         ) : <Badge tone="success">{TASK_STATUS[task.status as TaskStatus]}</Badge>}
         {manager && (
           <DialogButton label="Edit task" title="Edit task" subtitle={`${task.code} · ${task.title}`} icon={<Pencil className="h-4 w-4" />}>
-            <TaskForm projectCode={projectCode} milestoneId={milestoneId} task={task} employees={employees} manager={manager} />
+            <TaskForm projectCode={projectCode} milestoneId={milestoneId} task={task} employees={employees} manager={manager} minDate={minDate} maxDate={maxDate} />
           </DialogButton>
         )}
         {manager && (

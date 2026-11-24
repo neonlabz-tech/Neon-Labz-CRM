@@ -9,6 +9,9 @@ import { deleteFromR2 } from "@/lib/r2";
 import { uploadFile } from "@/lib/uploads";
 import { clientContactsSchema } from "@/schemas/client";
 import { Client } from "@/models/client";
+import { Invoice } from "@/models/invoice";
+import { ManualSale } from "@/models/manual-sale";
+import { Payment } from "@/models/payment";
 import { Project } from "@/models/project";
 import type { ActionState } from "@/types";
 
@@ -56,4 +59,25 @@ export async function saveClientContactsAction(_: ActionState, formData: FormDat
   revalidatePath("/clients");
   revalidatePath("/projects");
   return done("Client saved.");
+}
+
+/**
+ * The Super Admin removes a client. A client that already has a project or any payment, receipt or manual sale is kept,
+ * because those records feed the projects, finance and reports; the message says which one is in the way.
+ */
+export async function deleteClientAction(code: string): Promise<ActionState> {
+  const user = await requireAction("clients.delete");
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(code)) return fail("Client not found.");
+  await connectDb();
+  const client = await Client.findOne({ code }).select("code name").lean();
+  if (!client) return fail("Client not found.");
+  if (await Project.exists({ clientCode: code })) return fail(`${client.name} has a project, so the client cannot be removed.`);
+  if ((await Payment.exists({ clientCode: code })) || (await Invoice.exists({ clientCode: code }))) return fail(`${client.name} has payment or receipt records, so the client cannot be removed.`);
+  if (await ManualSale.exists({ clientCode: code })) return fail(`${client.name} comes from a manual sale or guest entry. Remove it from there (Own projects, Leads, Guest tab).`);
+  await Client.deleteOne({ code });
+  await writeAudit(user.username, "client.deleted", { code, name: client.name });
+  revalidatePath("/clients");
+  revalidatePath("/leads");
+  revalidatePath("/dashboard");
+  return done(`${client.name} removed.`);
 }

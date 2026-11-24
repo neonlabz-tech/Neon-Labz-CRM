@@ -14,24 +14,27 @@ import { companyGoals, periodTarget } from "@/lib/sales-targets";
 import type { SearchParams } from "@/lib/pagination";
 import { formatDay } from "@/lib/utils";
 import { Invoice } from "@/models/invoice";
+import { salesLeads } from "@/lib/own";
 import { Lead } from "@/models/lead";
 import { Payment } from "@/models/payment";
 
 export const metadata = { title: "Sales overview" };
 
 export default async function SalesOverviewPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  await requireAction("sales.targets");
+  const user = await requireAction("sales.targets");
   const sp = await searchParams;
   const today = todayISO();
   const { year, month, prefix } = readPeriod(sp, today);
   const dates = dateIn(prefix, "date");
   await connectDb();
+  // The Super Admin's own leads (Own projects) are not part of the sales team's numbers.
+  const team = salesLeads(user.username);
   const [leads, converted, collected, pending, due, company] = await Promise.all([
-    Lead.countDocuments(dates),
-    Lead.countDocuments({ status: "Converted", ...dates }),
+    Lead.countDocuments({ ...dates, ...team }),
+    Lead.countDocuments({ status: "Converted", ...dates, ...team }),
     Payment.aggregate<{ n: number }>(sum("amount", { status: "confirmed", ...dates })),
     Invoice.countDocuments({ approval: "pending" }),
-    Lead.find({ status: { $nin: ["Converted", "Lost"] as ("Converted" | "Lost")[] }, next: { $gt: "", $lte: today } }).select("leadId business phone owner next status").sort({ next: 1 }).limit(30).lean(),
+    Lead.find({ status: { $nin: ["Converted", "Lost"] as ("Converted" | "Lost")[] }, next: { $gt: "", $lte: today }, ...team }).select("leadId business phone owner next status").sort({ next: 1 }).limit(30).lean(),
     companyGoals(),
   ]);
 

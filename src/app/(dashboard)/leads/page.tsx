@@ -17,7 +17,7 @@ import { Pagination, SearchBar } from "@/components/ui/list-controls";
 import { requireAction } from "@/lib/auth";
 import { connectDb } from "@/lib/db";
 import { escapeRegex, pageOf, limitOf, skipOf, param, type SearchParams } from "@/lib/pagination";
-import { keepOwn, ownView } from "@/lib/own";
+import { keepOwn, ownLeads, ownView, salesLeads } from "@/lib/own";
 import { can, ownerScope } from "@/lib/permissions";
 import { formatDateTime, formatDay } from "@/lib/utils";
 import { dayRange, periodRange } from "@/lib/sales-range";
@@ -52,7 +52,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const canDelete = can(user.role, "leads.delete");
 
   // Whose leads, and from when. The four cards count within this; the table adds the stage, source and search on top.
-  const scope: Record<string, unknown> = { ...ownerScope(user), ...(own ? { owner: user.username, own: true } : user.role === "superadmin" ? { own: { $ne: true } } : {}) };
+  const scope: Record<string, unknown> = { ...ownerScope(user), ...(own ? ownLeads(user.username) : user.role === "superadmin" ? salesLeads(user.username) : {}) };
   if (admin && range.seller) scope.owner = range.seller;
   const created = dayRange(range);
   if (created) scope.date = created;

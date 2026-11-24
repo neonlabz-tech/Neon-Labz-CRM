@@ -20,10 +20,12 @@ type Props = {
   projectCode: string; type: ProjectType; role: Role; username: string;
   milestones: BoardMilestone[]; tasks: BoardTask[]; lanes: Department[];
   software: Person[]; marketing: Person[]; mixed: Person[];
+  /** The project's own dates, which every milestone must stay inside. */
+  projectStart?: string; projectDue?: string;
 };
 
 /** The Milestones part of a project: the task board of each milestone, with edit and delete next to each milestone and task. */
-export function MilestonesBoard({ projectCode, type, role, username, milestones, tasks, lanes, software, marketing, mixed }: Props) {
+export function MilestonesBoard({ projectCode, type, role, username, milestones, tasks, lanes, software, marketing, mixed, projectStart, projectDue }: Props) {
   const isEmployee = role === "employee";
   const poolFor = (department: Department) => (department === "marketing" ? marketing : software);
 
@@ -53,7 +55,7 @@ export function MilestonesBoard({ projectCode, type, role, username, milestones,
                   <Badge tone={finished ? "success" : m.status === "at-risk" ? "danger" : "info"}>{MILESTONE_STATUS[m.status as keyof typeof MILESTONE_STATUS]}</Badge>
                   {manager && (
                     <DialogButton label="Edit milestone" title="Edit milestone" subtitle={`${projectCode} · ${m.title}`} icon={<Pencil className="h-4 w-4" />}>
-                      <MilestoneForm admin={role === "superadmin"} projectCode={projectCode} type={type} allowed={lanes} employees={poolFor(m.department as Department)} milestone={{ id, title: m.title, startDate: m.startDate ?? "", dueDate: m.dueDate ?? "", department: m.department as Department, assignees: m.assignees }} />
+                      <MilestoneForm admin={role === "superadmin"} projectCode={projectCode} type={type} allowed={lanes} employees={poolFor(m.department as Department)} milestone={{ id, title: m.title, startDate: m.startDate ?? "", dueDate: m.dueDate ?? "", department: m.department as Department, assignees: m.assignees }} minDate={projectStart} maxDate={projectDue} />
                     </DialogButton>
                   )}
                   {manager && <MilestoneDelete code={projectCode} id={id} title={m.title} />}
@@ -64,7 +66,7 @@ export function MilestonesBoard({ projectCode, type, role, username, milestones,
                 {(Object.keys(TASK_STATUS) as (keyof typeof TASK_STATUS)[]).map((status) => (
                   <TaskColumn key={status} projectCode={projectCode} status={status} title={TASK_STATUS[status]} count={views.filter((t) => t.status === status).length} accepts={!finished && (manager || (isEmployee && status !== "done"))}>
                     {views.filter((t) => t.status === status).map((t) => (
-                      <TaskCard key={t._id} projectCode={projectCode} milestoneId={id} task={t} manager={manager} mine={t.assigneeCode === username} locked={finished} employees={poolFor(m.department as Department)} />
+                      <TaskCard key={t._id} projectCode={projectCode} milestoneId={id} task={t} manager={manager} mine={t.assigneeCode === username} locked={finished} employees={poolFor(m.department as Department)} minDate={m.startDate} maxDate={m.dueDate} />
                     ))}
                   </TaskColumn>
                 ))}
@@ -74,7 +76,7 @@ export function MilestonesBoard({ projectCode, type, role, username, milestones,
                 <InlineForms>
                   <details className="mt-4">
                     <summary className="cursor-pointer text-sm font-semibold text-brand-200 hover:text-white">Add a task</summary>
-                    <div className="mt-3 rounded-xl bg-white p-4 text-ink"><TaskForm projectCode={projectCode} milestoneId={id} employees={poolFor(m.department as Department)} manager={manager} /></div>
+                    <div className="mt-3 rounded-xl bg-white p-4 text-ink"><TaskForm projectCode={projectCode} milestoneId={id} employees={poolFor(m.department as Department)} manager={manager} minDate={m.startDate} maxDate={m.dueDate} /></div>
                   </details>
                 </InlineForms>
               )}
@@ -85,7 +87,7 @@ export function MilestonesBoard({ projectCode, type, role, username, milestones,
         {lanes.length > 0 && !isEmployee && (
           <Card>
             <h3 className="mb-3 font-semibold">Add a milestone</h3>
-            <InlineForms><MilestoneForm admin={role === "superadmin"} projectCode={projectCode} type={type} allowed={lanes} employees={lanes.length > 1 ? mixed : poolFor(lanes[0] ?? "software")} /></InlineForms>
+            <InlineForms><MilestoneForm admin={role === "superadmin"} projectCode={projectCode} type={type} allowed={lanes} employees={lanes.length > 1 ? mixed : poolFor(lanes[0] ?? "software")} minDate={projectStart} maxDate={projectDue} /></InlineForms>
           </Card>
         )}
       </div>

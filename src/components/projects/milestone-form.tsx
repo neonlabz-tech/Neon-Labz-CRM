@@ -9,16 +9,19 @@ type Props = {
   employees: { username: string; label: string }[]; milestone?: MilestoneView;
   /** The Super Admin adding to a project with both parts chooses which team it goes to, or both. */
   admin?: boolean;
+  /** The project's own dates: a milestone must stay inside them. */
+  minDate?: string; maxDate?: string;
 };
 
-export function MilestoneForm({ projectCode, type, allowed, employees, milestone, admin = false }: Props) {
+export function MilestoneForm({ projectCode, type, allowed, employees, milestone, admin = false, minDate, maxDate }: Props) {
   return (
     <ActionForm action={saveMilestoneAction} submit={milestone ? "Save milestone" : "Add milestone"} resetOnSuccess={!milestone} className="grid gap-3 sm:grid-cols-2">
       <input type="hidden" name="projectCode" value={projectCode} />
       {milestone && <input type="hidden" name="id" value={milestone.id} />}
       <div className="sm:col-span-2"><Field label="Milestone" name="title" defaultValue={milestone?.title} required /></div>
-      <Field label="Start" name="startDate" type="date" defaultValue={milestone?.startDate} />
-      <Field label="Due" required name="dueDate" type="date" defaultValue={milestone?.dueDate} />
+      <Field label="Start" name="startDate" type="date" defaultValue={milestone?.startDate} min={minDate || undefined} max={maxDate || undefined} />
+      <Field label="Due" required name="dueDate" type="date" defaultValue={milestone?.dueDate} min={minDate || undefined} max={maxDate || undefined} />
+      {(minDate || maxDate) && <p className="text-xs text-muted sm:col-span-2">Milestone dates must be within the project: {minDate || "…"} → {maxDate || "…"}.</p>}
       {admin && !milestone && type === "both" ? (
         <>
           <SelectField label="Send to" required name="audience" defaultValue="both">

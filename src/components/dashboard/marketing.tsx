@@ -38,7 +38,7 @@ export async function MarketingDashboard({ username, sp }: { username: string; s
     <>
       <PeriodFilter year={year} month={month} basePath="/dashboard" />
       <Hero kicker={username} title="Marketing dashboard" note={periodNote(year, month, MONTHS)} badge={`${reports} reports`} />
-      <Kpis items={[{ label: "Info documents", value: docs }, { label: "Content plans", value: plans }, { label: "Reports", value: reports }, { label: "Total tasks", value: tasks }, { label: "In progress", value: working }, { label: "Issues", value: issues }]} />
+      <Kpis items={[{ label: "Projects", value: ids.length }, { label: "Info documents", value: docs }, { label: "Content plans", value: plans }, { label: "Reports", value: reports }, { label: "Total tasks", value: tasks }, { label: "In progress", value: working }, { label: "Issues", value: issues }]} />
       <ChartGrid>
         <Ring title="Projects" data={slices(Object.entries(PROJECT_STATUS), byStatus)} />
         <Bars title="Marketing work" data={slices([["docs", "Info documents"], ["plans", "Content plans"], ["reports", "Reports"]], { docs, plans, reports })} />

@@ -1,14 +1,15 @@
 "use client";
 
-import { FilePlus, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
+import { FilePlus, Pencil, Plus, Send, Trash2, UserPlus } from "lucide-react";
 import { InfoForm } from "@/components/marketing/info-form";
 import { ProposalForm } from "@/components/reports/proposal-form";
 import { SrsForm } from "@/components/reports/forms";
 import { ConfirmButton } from "@/components/ui/confirm";
 import { DialogButton } from "@/components/ui/dialog-button";
+import { ActionForm } from "@/components/ui/form";
 import { SelectField } from "@/components/ui/field";
 import { PdfLink } from "@/components/ui/pdf-link";
-import { clearSpecialInfoAction, deleteSpecialClientAction, deleteSpecialDocAction, saveSpecialInfoAction, saveSpecialProposalAction, saveSpecialSrsAction } from "@/server/special-actions";
+import { clearSpecialInfoAction, deleteSpecialClientAction, deleteSpecialDocAction, saveSpecialInfoAction, saveSpecialProposalAction, saveSpecialSrsAction, sendSpecialClientAction } from "@/server/special-actions";
 import { ClientForm, QuoteForm, type ClientDefaults, type ClientOption, type QuoteDefaults } from "./forms";
 
 type PackageOption = { id: string; name: string; price: number; scope: string; fullScope: string; hasSummary: boolean };
@@ -40,9 +41,29 @@ export function AddClientButton() {
   );
 }
 
+/** The Super Admin picks the PM, the MD or both; they are notified and start the project from Clients. */
+function SendButton({ id, name }: { id: string; name: string }) {
+  const icon = <Send className="h-4 w-4" />;
+  return (
+    <DialogButton label="Send to PM / MD" title="Send to PM / MD" subtitle={name} icon={icon} headerIcon={<Send className="h-5 w-5" />}>
+      <ActionForm action={sendSpecialClientAction} submit="Send" className="space-y-4">
+        <input type="hidden" name="id" value={id} />
+        <SelectField label="Goes to" name="target" required defaultValue="">
+          <option value="" disabled>Choose who gets it</option>
+          <option value="pm">PM (software work)</option>
+          <option value="marketing">MD (marketing work)</option>
+          <option value="both">PM and MD</option>
+        </SelectField>
+        <p className="text-xs text-muted">They get a notification and the client appears in their Clients list, where they start the project and add milestones as usual. Sending again adds more people; it never takes anyone away.</p>
+      </ActionForm>
+    </DialogButton>
+  );
+}
+
 export function ClientActions({ client }: { client: ClientDefaults & { id: string } }) {
   return (
     <div className="flex gap-2">
+      <SendButton id={client.id} name={client.name ?? ""} />
       <DialogButton label="Edit" title="Edit client" subtitle={client.name} icon={edit} headerIcon={edit}><ClientForm defaults={client} /></DialogButton>
       <ConfirmButton icon={bin} label="Delete" title="Delete this client?" text="Its quotations, proposals, SRS documents and info are deleted with it. This cannot be undone." confirmLabel="Delete" run={() => deleteSpecialClientAction(client.id)} />
     </div>

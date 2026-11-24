@@ -4,15 +4,19 @@ import { isValidObjectId } from "mongoose";
 import { revalidatePath } from "next/cache";
 import { requireAction } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
-import { nextSeq } from "@/lib/counters";
+import { clientCode, nextSeq } from "@/lib/counters";
 import { connectDb } from "@/lib/db";
 import { done, fail, invalid } from "@/lib/form";
 import { quoteFigures } from "@/lib/money";
+import { notifyRole } from "@/lib/notify";
 import { cleanRich, richHasText } from "@/lib/rich-text";
 import { infoSchema } from "@/schemas/marketing";
 import { specialClientSchema, specialProposalSchema, specialQuoteSchema, specialSrsSchema } from "@/schemas/special";
 import { SOCIALS } from "@/lib/marketing";
 import { seal } from "@/lib/secrets";
+import { Client } from "@/models/client";
+import { UNASSIGNED } from "@/models/manual-sale";
+import { Project } from "@/models/project";
 import { SpecialClient, SpecialDoc, type SpecialKind } from "@/models/special";
 import type { ActionState } from "@/types";
 
@@ -41,6 +45,12 @@ export async function saveSpecialClientAction(_: ActionState, formData: FormData
     if (!result.matchedCount) return fail("That client was not found.");
     // Documents keep the client's name as it was written, so a rename is copied to them.
     await SpecialDoc.updateMany({ clientId: id }, { clientName: data.name });
+    // The Clients record made when it was sent to the PM / MD follows the same details.
+    const mirror = await Client.findOne({ specialId: id }).select("code").lean();
+    if (mirror) {
+      await Client.updateOne({ code: mirror.code }, { name: data.name, email: data.email, phone: data.phone, address: data.address, contactName: data.contact });
+      await Project.updateMany({ clientCode: mirror.code }, { clientName: data.name });
+    }
     await writeAudit(user.username, "special.client.updated", { id, name: data.name });
     refresh();
     return done("Client saved.");
@@ -62,6 +72,45 @@ export async function deleteSpecialClientAction(id: string): Promise<ActionState
   await writeAudit(user.username, "special.client.deleted", { code: client.code, name: client.name, documents: docs.deletedCount });
   refresh();
   return done(docs.deletedCount ? `${client.name} and ${docs.deletedCount} document${docs.deletedCount === 1 ? "" : "s"} deleted.` : `${client.name} deleted.`);
+}
+
+/**
+ * The Super Admin sends a special client to the PM, the MD or both. They are notified, and a Clients record is made
+ * so they can start the project and its milestones through the normal flow.
+ */
+export async function sendSpecialClientAction(_: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireAction("special.manage");
+  const id = String(formData.get("id") ?? "");
+  const target = String(formData.get("target") ?? "");
+  if (!isValidObjectId(id)) return fail("That client was not found.");
+  if (target !== "pm" && target !== "marketing" && target !== "both") return fail("Choose who to send it to.");
+  await connectDb();
+  const client = await SpecialClient.findById(id).lean();
+  if (!client) return fail("That client was not found.");
+
+  const roles: ("pm" | "marketing")[] = target === "both" ? ["pm", "marketing"] : [target];
+  const sentTo = [...new Set([...(client.sentTo ?? []), ...roles])];
+  const workType = sentTo.length > 1 ? "both" : sentTo[0] === "marketing" ? "marketing" : "software";
+
+  let code = client.clientCode ?? "";
+  if (code && (await Client.exists({ code }))) {
+    await Client.updateOne({ code }, { workType });
+  } else {
+    code = clientCode(await nextSeq("client"));
+    await Client.create({
+      code, name: client.name, email: client.email, phone: client.phone, address: client.address, contactName: client.contact,
+      service: `Special client · ${client.type}`, workType, leadId: client.code, salesOwner: UNASSIGNED, specialId: id,
+    });
+  }
+  await SpecialClient.updateOne({ _id: id }, { sentTo, sentAt: new Date(), clientCode: code });
+
+  const text = `${user.username} sent you ${client.name} (${client.code}). Open Clients to start the project and add its milestones.`;
+  for (const role of roles) await notifyRole(role, text, "/clients");
+  await writeAudit(user.username, "special.client.sent", { code: client.code, name: client.name, to: roles.join(",") });
+  refresh();
+  revalidatePath("/clients");
+  const names = roles.map((r) => (r === "pm" ? "PM" : "MD")).join(" and ");
+  return done(`${client.name} sent to ${names}.`);
 }
 
 /* ---------- Client info ---------- */

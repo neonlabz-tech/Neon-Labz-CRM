@@ -17,6 +17,11 @@ const clientSchema = new mongoose.Schema(
     // The "Client info" tab: the same details as the marketing client info (brand, contacts, social accounts).
     infoSaved: { type: Boolean, default: false },
     info: { type: mongoose.Schema.Types.Mixed, default: {} },
+    /** Who the Super Admin sent this client to: "pm" and / or "marketing" (the MD). */
+    sentTo: { type: [String], default: [] },
+    sentAt: { type: Date, default: null },
+    /** The Clients record made when the client is sent, so the PM and MD can start a project and milestones for it. */
+    clientCode: { type: String, default: "" },
   },
   { timestamps: true }
 );
@@ -50,7 +55,7 @@ docSchema.index({ kind: 1, createdAt: -1 });
 
 // A model that was loaded before these fields existed is replaced while developing.
 if (process.env.NODE_ENV !== "production") {
-  if (mongoose.models.SpecialClient && !mongoose.models.SpecialClient.schema.path("info")) mongoose.deleteModel("SpecialClient");
+  if (mongoose.models.SpecialClient && !mongoose.models.SpecialClient.schema.path("sentTo")) mongoose.deleteModel("SpecialClient");
   if (mongoose.models.SpecialDoc && !mongoose.models.SpecialDoc.schema.path("data")) mongoose.deleteModel("SpecialDoc");
 }
 

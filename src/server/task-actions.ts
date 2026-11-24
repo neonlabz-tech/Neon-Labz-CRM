@@ -35,6 +35,12 @@ export async function saveTaskAction(_: ActionState, formData: FormData): Promis
   const existing = id && isId(id) ? await Task.findOne({ _id: id, projectId: project._id }) : null;
   if (id && !existing) return fail("Task not found.");
 
+  // Task dates must stay inside the milestone's own start and due dates (only checked when the date is new or changed).
+  const outside = (d: string) => Boolean(d) && ((milestone.startDate && d < milestone.startDate) || (milestone.dueDate && d > milestone.dueDate));
+  const range = `${milestone.startDate || "…"} → ${milestone.dueDate || "…"}`;
+  if (data.startDate && data.startDate !== existing?.startDate && outside(data.startDate)) return fail(`Start date must be within the milestone dates (${range}).`);
+  if (data.dueDate && data.dueDate !== existing?.dueDate && outside(data.dueDate)) return fail(`Due date must be within the milestone dates (${range}).`);
+
   const lane = milestone.department;
   let assigneeCode = data.assigneeCode;
   let status = data.status as TaskStatus;
@@ -71,6 +77,9 @@ export async function saveTaskAction(_: ActionState, formData: FormData): Promis
   if (user.role !== "employee" && status === "done" && existing?.status !== "done" && assigneeCode) {
     await notifyUsers([assigneeCode], `${user.username} marked “${saved.title}” as done.`, "/my-work");
   }
+  if (user.role !== "employee" && before === "done" && status !== "done" && assigneeCode) {
+    await notifyUsers([assigneeCode], `${user.username} moved “${saved.title}” back to ${TASK_STATUS[status]}.`, "/my-work");
+  }
   if (before && before !== status) {
     await writeAudit(user.username, "task.status", { task: saved.title, project: project.name, milestone: milestone.title, from: before, to: status });
   }
@@ -103,6 +112,9 @@ export async function moveTaskAction(code: string, taskId: string, status: TaskS
   await writeAudit(user.username, "task.status", { task: task.title, project: project.name, milestone: milestone.title, from: before, to: status });
   if (user.role !== "employee" && status === "done" && before !== "done" && task.assigneeCode) {
     await notifyUsers([task.assigneeCode], `${user.username} marked “${task.title}” as done.`, "/my-work");
+  }
+  if (user.role !== "employee" && before === "done" && status !== "done" && task.assigneeCode) {
+    await notifyUsers([task.assigneeCode], `${user.username} moved “${task.title}” back to ${TASK_STATUS[status]}.`, "/my-work");
   }
   if (user.role === "employee" && task.department === "marketing") await notifyRole("marketing", `${user.username} moved “${task.title}” to ${TASK_STATUS[status]}.`, `/projects/${code}`);
   refresh(code);

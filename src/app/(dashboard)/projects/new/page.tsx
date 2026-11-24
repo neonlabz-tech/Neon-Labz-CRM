@@ -7,7 +7,6 @@ import { ownView } from "@/lib/own";
 import { param, type SearchParams } from "@/lib/pagination";
 import { backfillWorkTypes } from "@/lib/client-work";
 import { clientWorkFilter, workTypeOfClient } from "@/lib/work-type";
-import Link from "next/link";
 import { Client } from "@/models/client";
 import { createProjectAction } from "@/server/project-actions";
 
@@ -31,11 +30,6 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
   return (
     <>
       <PageHeader title="New project" subtitle="Only clients whose payment was approved can have a project." />
-      <p className="mb-4 text-sm text-muted">
-        Create the project first. Then {user.role === "superadmin" || user.role === "pm"
-          ? <>open <Link href="/reports/proposals" className="font-semibold text-brand-700 hover:underline">Reports → Proposals</Link> and choose this project to prepare its proposal.</>
-          : "ask the Project Manager or Super Admin to open Reports → Proposals and choose this project."}
-      </p>
       {clients.length === 0 ? (
         <EmptyState title="No clients yet" text={own ? "A client appears here once one of your own leads is converted and its payment is confirmed." : "A client appears here after the Super Admin approves their payment."} />
       ) : (

@@ -8,9 +8,9 @@ export type TaskView = {
   id: string; code: string; title: string; priority: string; assigneeCode: string; startDate: string; dueDate: string;
   description: string; status: string;
 };
-type Props = { projectCode: string; milestoneId: string; task?: TaskView; employees: { username: string; label: string }[]; manager: boolean };
+type Props = { projectCode: string; milestoneId: string; task?: TaskView; employees: { username: string; label: string }[]; manager: boolean; minDate?: string; maxDate?: string };
 
-export function TaskForm({ projectCode, milestoneId, task, employees, manager }: Props) {
+export function TaskForm({ projectCode, milestoneId, task, employees, manager, minDate, maxDate }: Props) {
   const statuses = Object.entries(TASK_STATUS).filter(([key]) => manager || key !== "done");
   return (
     <ActionForm action={saveTaskAction} submit={task ? "Save task" : "Add task"} resetOnSuccess={!task} className="grid gap-3 sm:grid-cols-2">
@@ -30,8 +30,9 @@ export function TaskForm({ projectCode, milestoneId, task, employees, manager }:
           {employees.map((e) => <option key={e.username} value={e.username}>{e.label}</option>)}
         </SelectField>
       )}
-      <Field label="Start" name="startDate" type="date" defaultValue={task?.startDate} />
-      <Field label="Due" name="dueDate" type="date" defaultValue={task?.dueDate} />
+      <Field label="Start" name="startDate" type="date" defaultValue={task?.startDate} min={minDate || undefined} max={maxDate || undefined} />
+      <Field label="Due" name="dueDate" type="date" defaultValue={task?.dueDate} min={minDate || undefined} max={maxDate || undefined} />
+      {(minDate || maxDate) && <p className="text-xs text-muted sm:col-span-2">Task dates must be within the milestone: {minDate || "…"} → {maxDate || "…"}.</p>}
       <div className="sm:col-span-2"><RichText label="Details" name="description" defaultValue={task?.description} placeholder="Add the task breakdown, links or notes." /></div>
     </ActionForm>
   );
