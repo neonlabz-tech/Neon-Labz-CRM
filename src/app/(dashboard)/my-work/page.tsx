@@ -9,6 +9,7 @@ import { historyProjectIds, visibleProjectFilter } from "@/lib/project-access";
 import { escapeRegex, param, type SearchParams } from "@/lib/pagination";
 import { PRIORITY, TASK_STATUS } from "@/lib/projects";
 import { Project } from "@/models/project";
+import { Notice } from "@/models/notice";
 import { Task } from "@/models/task";
 import { CheckCircle2, Clock, ListTodo } from "lucide-react";
 
@@ -24,7 +25,7 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
   await connectDb();
   // Tasks of projects in History stay out of the lists and the counts.
   const inHistory = { projectId: { $nin: await historyProjectIds() } };
-  const [projects, tasks, totals] = await Promise.all([
+  const [projects, tasks, totals, unread] = await Promise.all([
     Project.find(await visibleProjectFilter(user)).select("code name clientName dueDate").sort({ createdAt: -1 }).limit(50).lean(),
     Task.find({
       assigneeCode: user.username,
@@ -34,7 +35,10 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
       ...(priorityFilter in PRIORITY && { priority: priorityFilter }),
     }).select("code title status dueDate priority projectId").sort({ createdAt: -1 }).limit(200).lean(),
     Task.aggregate<{ _id: string; n: number }>([{ $match: { assigneeCode: user.username, ...inHistory } }, { $group: { _id: "$status", n: { $sum: 1 } } }]),
+    // Notifications of each project, shown as a count on its card until the project itself is opened (reading them in the bell does not clear it).
+    Notice.aggregate<{ _id: string; n: number }>([{ $match: { to: user.username, projectSeen: false, link: /^\/projects\// } }, { $group: { _id: "$link", n: { $sum: 1 } } }]),
   ]);
+  const unreadOf = (code: string) => unread.find((u) => u._id === `/projects/${code}`)?.n ?? 0;
   const shown = projectFilter ? tasks.filter((t) => String(t.projectId) === projectFilter) : tasks;
   const count = (status: string) => totals.find((t) => t._id === status)?.n ?? 0;
   const today = todayISO();
@@ -55,7 +59,10 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
       ) : (
         <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {projects.map((p) => (
-            <Link prefetch={false} key={p.code} href={`/projects/${p.code}`} className="rounded-2xl border border-line bg-white p-5 hover:border-brand-300">
+            <Link prefetch={false} key={p.code} href={`/projects/${p.code}`} className="relative rounded-2xl border border-line bg-white p-5 hover:border-brand-300">
+              {unreadOf(p.code) > 0 && (
+                <span className="brand-gradient absolute -right-2 -top-2 grid h-6 min-w-6 place-items-center rounded-full px-1.5 text-xs font-bold text-white shadow" aria-label={`${unreadOf(p.code)} unread notifications`}>{unreadOf(p.code) > 9 ? "9+" : unreadOf(p.code)}</span>
+              )}
               <p className="font-semibold">{p.name}</p>
               <p className="text-sm text-muted">{p.code} · {p.clientName}</p>
               {p.dueDate && <p className="mt-2 text-xs text-muted">Due {p.dueDate}</p>}

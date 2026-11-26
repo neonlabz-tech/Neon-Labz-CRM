@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NoticeLink } from "@/components/notice-row";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AdminDashboard } from "@/components/dashboard/admin";
@@ -28,7 +28,7 @@ async function Notices({ username }: { username: string }) {
       <ul className="divide-y divide-line text-sm">
         {items.map((n) => (
           <li key={String(n._id)} className="py-2.5">
-            {n.link ? <Link prefetch={false} href={n.link} className="font-medium text-brand-700 hover:underline">{n.text}</Link> : n.text}
+            {n.link ? <NoticeLink id={String(n._id)} link={n.link}>{n.text}</NoticeLink> : n.text}
             <span className="ml-2 text-xs text-muted">{formatDateTime(n.createdAt)}</span>
           </li>
         ))}

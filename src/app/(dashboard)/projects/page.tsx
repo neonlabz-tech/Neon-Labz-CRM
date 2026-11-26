@@ -92,6 +92,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       <DialogButton wide label="Milestones and tasks" title={r.name} subtitle={`${r.code} · ${r.clientName} · ${type}`} icon={<Flag className="h-4 w-4" />}>
         <MilestonesBoard
           projectCode={r.code}
+          projectStart={r.startDate}
+          projectDue={r.dueDate}
           type={type}
           role={user.role}
           username={user.username}

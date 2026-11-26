@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useActionState, useContext, useEffect, useId, useRef, useState, useTransition } from "react";
+import { createContext, Fragment, useActionState, useContext, useEffect, useId, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { Button } from "./button";
@@ -46,6 +46,8 @@ export function ActionForm({ action, submit, children, toastOnSuccess = true, re
   const snapshot = useRef("");
   const submitting = useRef(false);
   const [shown, setShown] = useState<Shown>({});
+  // Bumped after a saved "add" form: every field (including the rich-text Details box) starts again from empty.
+  const [round, setRound] = useState(0);
   const [dismissed, setDismissed] = useState<{ state: ActionState; names: string[] }>({ state: idle, names: [] });
 
   const setDirty = modal?.setDirty;
@@ -67,7 +69,7 @@ export function ActionForm({ action, submit, children, toastOnSuccess = true, re
     const form = formRef.current;
     if (!form) return;
     if (state.ok) {
-      if (resetOnSuccess) { form.reset(); touched.current.clear(); }
+      if (resetOnSuccess) { form.reset(); touched.current.clear(); setShown({}); setRound((n) => n + 1); }
       snapshot.current = serialize(form);
       setDirty?.(false);
       closeModal?.();
@@ -144,7 +146,7 @@ export function ActionForm({ action, submit, children, toastOnSuccess = true, re
 
   return (
     <form id={formId} method="post" ref={formRef} noValidate onSubmit={onSubmit} onBlur={onBlur} onChange={onChange} className={className ?? "space-y-4"}>
-      <ErrorsContext.Provider value={errors}>{children}</ErrorsContext.Provider>
+      <ErrorsContext.Provider value={errors}><Fragment key={round}>{children}</Fragment></ErrorsContext.Provider>
       {loose.length > 0 && (
         <ul className="col-span-full space-y-0.5 text-sm font-medium text-danger" role="alert">
           {loose.map((item) => <li key={item.label}>{item.label}: {item.message}</li>)}

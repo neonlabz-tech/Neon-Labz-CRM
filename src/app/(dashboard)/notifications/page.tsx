@@ -1,12 +1,11 @@
-import Link from "next/link";
-import { BellRing } from "lucide-react";
+import { NoticeRow } from "@/components/notice-row";
 import { Button } from "@/components/ui/button";
 import { EmptyState, PageHeader } from "@/components/ui/card";
 import { Pagination } from "@/components/ui/list-controls";
 import { requireUser } from "@/lib/auth";
 import { connectDb } from "@/lib/db";
 import { pageOf, limitOf, skipOf, type SearchParams } from "@/lib/pagination";
-import { cn, formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
 import { markNoticesReadAction } from "@/server/notice-actions";
 import { Notice } from "@/models/notice";
 
@@ -29,15 +28,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
       </PageHeader>
       {items.length === 0 ? <EmptyState title="No notifications yet" text="Payments, assignments and approvals will show up here." /> : (
         <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">
-          {items.map((n) => {
-            const body = (
-              <span className="flex items-start gap-3">
-                <BellRing className={cn("mt-0.5 h-4 w-4 shrink-0", n.read ? "text-muted" : "text-brand-600")} />
-                <span><span className={cn("block text-sm", !n.read && "font-semibold")}>{n.text}</span><span className="mt-0.5 block text-xs text-muted">{formatDateTime(n.createdAt)}</span></span>
-              </span>
-            );
-            return <li key={String(n._id)} className={cn(!n.read && "bg-brand-50/60")}>{n.link ? <Link prefetch={false} href={n.link} className="block px-4 py-3 hover:bg-brand-50">{body}</Link> : <div className="px-4 py-3">{body}</div>}</li>;
-          })}
+          {items.map((n) => <li key={String(n._id)}><NoticeRow id={String(n._id)} text={n.text} when={formatDateTime(n.createdAt)} link={n.link} read={n.read} /></li>)}
         </ul>
       )}
       <Pagination page={page} total={total} query={{}} />

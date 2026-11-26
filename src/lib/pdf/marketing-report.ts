@@ -7,6 +7,7 @@ import { REPORT_PLATFORMS, emptyPlatform, platformHasData, type PlatformData } f
 
 export type ReportDocInput = {
   clientName: string; title: string; startDate: string; endDate: string; nextActions: string[]; contentDirection?: string | null; clientSummary: string;
+  metaSummary?: string; metaShots?: { url: string; caption: string }[];
   platforms?: Partial<Record<string, Partial<PlatformData>>>;
 };
 
@@ -139,9 +140,11 @@ export async function marketingReportHtml(report: ReportDocInput, assets: Assets
   const title = (report.title || "Social Media Completion Report").toUpperCase();
 
   // Pictures first, all at once.
+  const metaShots = (report.metaShots ?? []).filter((s) => s.url);
   const [clientLogo, ...shotImages] = await Promise.all([
     embed(clientLogoUrl),
     ...used.flatMap(([key]) => data(key).shots.map((s) => embed(s.url))),
+    ...metaShots.map((s) => embed(s.url)),
   ]);
   const shotsOf = new Map<string, { img: Img; caption: string }[]>();
   let at = 0;
@@ -152,6 +155,11 @@ export async function marketingReportHtml(report: ReportDocInput, assets: Assets
       if (img) list.push({ img, caption: shot.caption });
     }
     shotsOf.set(key, list);
+  }
+  const metaList: { img: Img; caption: string }[] = [];
+  for (const shot of metaShots) {
+    const img = shotImages[at++];
+    if (img) metaList.push({ img, caption: shot.caption });
   }
 
   // Sections: Facebook and Instagram share one, as Meta shows them together; every other platform has its own.
@@ -181,10 +189,20 @@ export async function marketingReportHtml(report: ReportDocInput, assets: Assets
     sections.push(blocks);
   });
 
+  // Meta ads performance & summary: one line, then the screenshots.
+  const metaSummary = (report.metaSummary ?? "").trim();
+  if (metaSummary || metaList.length) {
+    const blocks: Block[] = [secTitle(sections.length + 1, "Meta Ads Performance & Summary")];
+    if (metaSummary) blocks.push(para(metaSummary));
+    const rows = evidenceRows(metaList);
+    if (rows.length) blocks.push(together(sub("Meta ads analytics evidence"), rows[0]!), ...rows.slice(1));
+    sections.push(blocks);
+  }
+
   // Last section: audience tables and the closing summary.
   const closing: Block[] = [];
   const audienceKeys = keys.filter((key) => data(key).audience.some((a) => a.label.trim() && a.value.trim()));
-  closing.push(secTitle(groups.length + 1, audienceKeys.length ? "Audience Insights & Completion Summary" : "Completion Summary"));
+  closing.push(secTitle(sections.length + 1, audienceKeys.length ? "Audience Insights & Completion Summary" : "Completion Summary"));
   for (const key of audienceKeys) {
     const rows = data(key).audience.filter((a) => a.label.trim() && a.value.trim()).map((a): [string, string] => [a.label, a.value]);
     closing.push(together(sub(`${labelOf(key)} audience`), twoColumnTable(["Audience metric", "Result shown"], rows, true)));

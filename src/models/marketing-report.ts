@@ -34,6 +34,9 @@ const schema = new mongoose.Schema(
     nextActions: { type: [String], default: [] },
     contentDirection: t,
     clientSummary: { type: String, required: true },
+    /** "Meta ads performance & summary": one line, then screenshots of the Meta ads results. */
+    metaSummary: t,
+    metaShots: { type: [shot], default: [] },
     createdBy: { type: String, required: true },
     pdfUrl: t,
   },

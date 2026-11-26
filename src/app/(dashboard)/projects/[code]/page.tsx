@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { ArchiveProject } from "@/components/projects/project-actions";
+import { ProjectSeen } from "@/components/projects/project-seen";
 import { MilestonesBoard } from "@/components/projects/milestones-board";
 import { TeamForm } from "@/components/projects/team-form";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +48,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ code: 
 
   return (
     <>
+      <ProjectSeen code={project.code} />
       <PageHeader title={project.name} subtitle={`${project.code} · ${project.clientName} · ${type}`}>
         <div className="flex items-center gap-2">
           <Badge tone={shownStatus === "completed" ? "success" : shownStatus === "on-hold" ? "warning" : "info"}>{PROJECT_STATUS[shownStatus as keyof typeof PROJECT_STATUS]}</Badge>

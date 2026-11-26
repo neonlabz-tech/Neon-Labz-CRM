@@ -15,7 +15,7 @@ type State = { intro: string; analysis: string; metrics: ReportRow[]; posts: Rep
 type Props = {
   id?: string;
   clients: { code: string; name: string }[];
-  values: { clientCode: string; title: string; startDate: string; endDate: string; contentDirection: string; clientSummary: string; nextActions: string[] };
+  values: { clientCode: string; title: string; startDate: string; endDate: string; contentDirection: string; clientSummary: string; nextActions: string[]; metaSummary: string; metaShots: { url: string; caption: string }[] };
   platforms: Record<string, PlatformData>;
 };
 
@@ -71,6 +71,7 @@ export function ReportForm({ id, clients, values, platforms }: Props) {
   const [actions, setActions] = useState(values.nextActions.length ? values.nextActions : [""]);
   const [clientCode, setClientCode] = useState(values.clientCode);
   const [summary, setSummary] = useState(values.clientSummary);
+  const [metaShots, setMetaShots] = useState<Shot[]>(() => values.metaShots.map((s) => ({ key: nextKey(), url: s.url, caption: s.caption })));
 
   const patch = (platform: string, next: Partial<State>) => setData((all) => ({ ...all, [platform]: { ...all[platform]!, ...next } }));
   const filled = (platform: string) => {
@@ -155,6 +156,24 @@ export function ReportForm({ id, clients, values, platforms }: Props) {
           </div>
         );
       })}
+
+      <section className="space-y-3">
+        <h3 className="font-semibold">Meta ads performance &amp; summary</h3>
+        <input type="hidden" name="meta_data" value={JSON.stringify({ shots: metaShots })} />
+        <Field label="Summary (one line)" name="metaSummary" defaultValue={values.metaSummary} maxLength={300} placeholder="For example: Meta ads reached 42,000 people for Rs. 15,000 this month." />
+        <h4 className="text-sm font-medium">Screenshots</h4>
+        <p className="text-xs text-muted">JPG, PNG or WebP, up to 5 MB each. They appear in the PDF as analytics evidence.</p>
+        {metaShots.map((shot) => (
+          <div key={shot.key} className="grid items-center gap-2 sm:grid-cols-[1fr_1fr_auto]">
+            {shot.url
+              ? <Image src={shot.url} alt="Meta ads screenshot" width={160} height={96} unoptimized className="h-14 w-24 rounded-lg border border-line object-cover" />
+              : <input type="file" name={`meta_file_${shot.key}`} accept="image/jpeg,image/png,image/webp" aria-label="Screenshot file" className="text-sm file:mr-3 file:h-9 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:text-xs file:font-semibold file:text-brand-700" />}
+            <input aria-label="Caption" placeholder="Caption (optional)" value={shot.caption} onChange={(e) => setMetaShots(metaShots.map((s) => (s.key === shot.key ? { ...s, caption: e.target.value } : s)))} className={input} maxLength={200} />
+            <button type="button" aria-label="Remove screenshot" onClick={() => setMetaShots(metaShots.filter((s) => s.key !== shot.key))} className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-danger hover:bg-brand-50"><Trash2 className="h-4 w-4" /></button>
+          </div>
+        ))}
+        {metaShots.length < 12 && <button type="button" onClick={() => setMetaShots([...metaShots, { key: nextKey(), url: "", caption: "" }])} className="inline-flex h-8 items-center gap-2 rounded-lg border border-line px-3 text-xs font-semibold hover:bg-brand-50"><Plus className="h-4 w-4" />Add screenshot</button>}
+      </section>
 
       <section className="space-y-3">
         <h3 className="font-semibold">Insights and client summary</h3>

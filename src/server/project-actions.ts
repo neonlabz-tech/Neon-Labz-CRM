@@ -94,7 +94,7 @@ export async function setTeamAction(code: string, lane: "software" | "marketing"
   if (lane === "software") project.assignees = team;
   else project.marketingAssignees = team;
   await project.save();
-  await notifyUsers(added, `${user.username} added you to ${project.name}. Open My work to see your tasks.`, "/my-work");
+  await notifyUsers(added, `${user.username} added you to ${project.name}. Open the project to see your tasks.`, `/projects/${code}`);
   await writeAudit(user.username, "project.team", { code, lane, team });
   revalidatePath("/projects");
   revalidatePath(`/projects/${code}`);
@@ -159,6 +159,9 @@ export async function saveMilestoneAction(_: ActionState, formData: FormData): P
     }
     // Anyone named on a milestone joins that part of the team.
     const lane = department === "marketing" ? "marketingAssignees" : "assignees";
+    // People newly put on this milestone hear about it, and the project card on My work shows a count until they open it.
+    const fresh = assignees.filter((a) => !(existing?.assignees ?? []).includes(a));
+    await notifyUsers(fresh, `${user.username} added you to the milestone “${data.title}” on ${project.name}.`, `/projects/${code}`);
     project[lane] = [...new Set([...project[lane], ...assignees])];
   }
   await project.save();
