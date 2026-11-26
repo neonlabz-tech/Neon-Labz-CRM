@@ -14,7 +14,7 @@ export default async function NewReportPage() {
     <>
       <PageHeader title="Create report" />
       {clients.length === 0 ? <EmptyState title="Add client info first" text="Reports are made for clients that have a Client info document." /> : (
-        <Card><ReportForm clients={clients.map((c) => ({ code: c.clientCode, name: c.brandName || c.clientName }))} values={{ clientCode: "", title: "", startDate: "", endDate: "", contentDirection: "", clientSummary: "", nextActions: [] }} platforms={{}} /></Card>
+        <Card><ReportForm clients={clients.map((c) => ({ code: c.clientCode, name: c.brandName || c.clientName }))} values={{ clientCode: "", title: "", startDate: "", endDate: "", contentDirection: "", clientSummary: "", nextActions: [], metaSummary: "", metaShots: [] }} platforms={{}} /></Card>
       )}
     </>
   );

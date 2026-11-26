@@ -170,13 +170,22 @@ export async function saveReportAction(_: ActionState, formData: FormData): Prom
     platforms[platform] = result.data;
   }
 
+  // Meta ads screenshots are read the same way as a platform's: kept ones stay, new files are uploaded.
+  const metaBefore = (existing?.metaShots ?? []).map((s) => s.url).filter(Boolean) as string[];
+  const metaResult = await readPlatform("meta", formData, metaBefore, fresh);
+  if ("error" in metaResult) {
+    await Promise.all(fresh.map(deleteFromR2));
+    return fail(metaResult.error);
+  }
+  removed.push(...metaBefore.filter((url) => !metaResult.kept.includes(url)));
+
   if (!Object.values(platforms).some((p) => platformHasData(p))) {
     await Promise.all(fresh.map(deleteFromR2));
     return fail("Add numbers, notes or screenshots for at least one social platform.");
   }
 
   const nextActions = formData.getAll("nextActions").map((v) => String(v).trim().slice(0, 500)).filter(Boolean).slice(0, 20);
-  const fields = { ...data, clientName: info.brandName || info.clientName, platforms, nextActions, pdfUrl: "" };
+  const fields = { ...data, clientName: info.brandName || info.clientName, platforms, metaShots: metaResult.data.shots, nextActions, pdfUrl: "" };
   const oldPdf = existing?.pdfUrl;
   if (existing) {
     existing.set(fields);
@@ -193,9 +202,12 @@ export async function saveReportAction(_: ActionState, formData: FormData): Prom
 export async function deleteReportAction(id: string): Promise<ActionState> {
   const user = await requireAction("marketing.manage");
   await connectDb();
-  const report = isId(id) ? await MarketingReport.findByIdAndDelete(id).select("platforms pdfUrl").lean() : null;
+  const report = isId(id) ? await MarketingReport.findByIdAndDelete(id).select("platforms metaShots pdfUrl").lean() : null;
   if (!report) return fail("Report not found.");
-  const urls = REPORT_PLATFORMS.flatMap(([p]) => (report.platforms?.[p]?.shots ?? []).map((s) => s.url).filter(Boolean) as string[]);
+  const urls = [
+    ...REPORT_PLATFORMS.flatMap(([p]) => (report.platforms?.[p]?.shots ?? []).map((s) => s.url).filter(Boolean) as string[]),
+    ...((report.metaShots ?? []).map((s) => s.url).filter(Boolean) as string[]),
+  ];
   await Promise.all([...urls, ...(report.pdfUrl ? [report.pdfUrl] : [])].map(deleteFromR2));
   await writeAudit(user.username, "marketing.report.deleted", { id });
   revalidatePath("/marketing/reports");

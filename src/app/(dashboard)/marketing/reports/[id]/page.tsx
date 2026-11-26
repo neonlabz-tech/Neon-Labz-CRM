@@ -28,7 +28,7 @@ export default async function EditReportPage({ params }: { params: Promise<{ id:
         <ReportForm
           id={id}
           clients={clients.map((c) => ({ code: c.clientCode, name: c.brandName || c.clientName }))}
-          values={{ clientCode: report.clientCode, title: report.title, startDate: report.startDate, endDate: report.endDate, contentDirection: report.contentDirection, clientSummary: report.clientSummary, nextActions: report.nextActions }}
+          values={{ clientCode: report.clientCode, title: report.title, startDate: report.startDate, endDate: report.endDate, contentDirection: report.contentDirection, clientSummary: report.clientSummary, nextActions: report.nextActions, metaSummary: report.metaSummary ?? "", metaShots: (report.metaShots ?? []).map((s) => ({ url: s.url, caption: s.caption })) }}
           platforms={platforms}
         />
       </Card>

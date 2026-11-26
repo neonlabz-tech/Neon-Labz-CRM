@@ -72,13 +72,13 @@ export async function saveTaskAction(_: ActionState, formData: FormData): Promis
   await recomputeMilestone(milestone._id);
 
   if (user.role !== "employee" && assigneeCode && assigneeCode !== existing?.assigneeCode) {
-    await notifyUsers([assigneeCode], `${user.username} assigned you “${saved.title}” on ${project.name}.`, "/my-work");
+    await notifyUsers([assigneeCode], `${user.username} assigned you “${saved.title}” on ${project.name}.`, `/projects/${code}`);
   }
   if (user.role !== "employee" && status === "done" && existing?.status !== "done" && assigneeCode) {
-    await notifyUsers([assigneeCode], `${user.username} marked “${saved.title}” as done.`, "/my-work");
+    await notifyUsers([assigneeCode], `${user.username} marked “${saved.title}” as done.`, `/projects/${code}`);
   }
   if (user.role !== "employee" && before === "done" && status !== "done" && assigneeCode) {
-    await notifyUsers([assigneeCode], `${user.username} moved “${saved.title}” back to ${TASK_STATUS[status]}.`, "/my-work");
+    await notifyUsers([assigneeCode], `${user.username} moved “${saved.title}” back to ${TASK_STATUS[status]}.`, `/projects/${code}`);
   }
   if (before && before !== status) {
     await writeAudit(user.username, "task.status", { task: saved.title, project: project.name, milestone: milestone.title, from: before, to: status });
@@ -111,10 +111,10 @@ export async function moveTaskAction(code: string, taskId: string, status: TaskS
   await recomputeMilestone(milestone._id);
   await writeAudit(user.username, "task.status", { task: task.title, project: project.name, milestone: milestone.title, from: before, to: status });
   if (user.role !== "employee" && status === "done" && before !== "done" && task.assigneeCode) {
-    await notifyUsers([task.assigneeCode], `${user.username} marked “${task.title}” as done.`, "/my-work");
+    await notifyUsers([task.assigneeCode], `${user.username} marked “${task.title}” as done.`, `/projects/${code}`);
   }
   if (user.role !== "employee" && before === "done" && status !== "done" && task.assigneeCode) {
-    await notifyUsers([task.assigneeCode], `${user.username} moved “${task.title}” back to ${TASK_STATUS[status]}.`, "/my-work");
+    await notifyUsers([task.assigneeCode], `${user.username} moved “${task.title}” back to ${TASK_STATUS[status]}.`, `/projects/${code}`);
   }
   if (user.role === "employee" && task.department === "marketing") await notifyRole("marketing", `${user.username} moved “${task.title}” to ${TASK_STATUS[status]}.`, `/projects/${code}`);
   refresh(code);

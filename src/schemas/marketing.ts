@@ -54,6 +54,7 @@ export const reportSchema = z
     endDate: z.string().regex(ISO_DATE, "Choose the report end date."),
     contentDirection: z.string().trim().max(3000).default(""),
     clientSummary: z.string().trim().min(1, "Add the client summary.").max(4000),
+    metaSummary: z.string().trim().max(300).default(""),
   })
   .refine((v) => v.endDate >= v.startDate, { path: ["endDate"], message: "The end date is before the start date." });
 
