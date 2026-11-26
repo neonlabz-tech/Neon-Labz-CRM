@@ -56,7 +56,7 @@ export const ACTIONS = {
   "content.tab": ["superadmin"],
   "issues.manage": ["superadmin", "pm", "marketing"],
   "reports.manage": ["superadmin", "pm"],
-  "tasks.work": ["employee"],
+  "tasks.work": ["employee", "pm", "marketing"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Action = keyof typeof ACTIONS;

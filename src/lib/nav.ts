@@ -91,14 +91,6 @@ const GROUPS: AreaGroup[] = [
         ],
       },
       {
-        title: "My work", icon: "work",
-        tabs: [
-          { href: "/my-work", label: "Tasks", action: "tasks.work" },
-          { href: "/productivity", label: "Productivity", action: "tasks.work" },
-          { href: "/activity", label: "My activity", action: "tasks.work" },
-        ],
-      },
-      {
         title: "Marketing", icon: "info", hideFor: ["superadmin"],
         tabs: [
           { href: "/marketing/info", label: "Client info", action: "marketing.view" },
@@ -111,6 +103,14 @@ const GROUPS: AreaGroup[] = [
       {
         title: "Content Tracker", icon: "plans", action: "content.sidebar",
         tabs: [{ href: "/content-tracker", label: "Content Tracker", action: "content.track" }],
+      },
+      {
+        title: "My work", icon: "work",
+        tabs: [
+          { href: "/my-work", label: "Tasks", action: "tasks.work" },
+          { href: "/productivity", label: "Productivity", action: "tasks.work" },
+          { href: "/activity", label: "My activity", action: "tasks.work" },
+        ],
       },
       {
         title: "Special Clients", icon: "users", action: "special.manage",
@@ -130,7 +130,7 @@ const GROUPS: AreaGroup[] = [
       { title: "Clients", icon: "clients", tabs: [{ href: "/clients", label: "Clients", action: "clients.view" }] },
       { title: "Packages", icon: "packages", tabs: [{ href: "/packages", label: "Packages", action: "packages.view" }] },
       { title: "Finance", icon: "finance", tabs: [{ href: "/finance", label: "Finance", action: "finance.view" }] },
-      { title: "HR", icon: "hrms", tabs: [{ href: "/hrms", label: "HR", action: "hrms.manage" }] },
+      { title: "HRM", icon: "hrms", tabs: [{ href: "/hrms", label: "HRM", action: "hrms.manage" }] },
     ],
   },
   {
@@ -164,7 +164,12 @@ export function navFor(role: Role): NavGroup[] {
  * The sidebar entry the person is in. The PM and MD areas of the Super Admin share some pages (Projects, Sprints, ...),
  * so the team in the address (pm=PM or pm=MD, or an account of that team) tells them apart.
  */
-export function activeItem(groups: NavGroup[], path: string, own: boolean, pm: string): NavItem | undefined {
+export function activeItem(groups: NavGroup[], path: string, own: boolean, pm: string, work = false): NavItem | undefined {
+  // A project opened from My work (work=1) keeps My work lit instead of jumping to the Projects area.
+  if (work) {
+    const mine = groups.flatMap((g) => g.items).find((i) => i.match.includes("/my-work"));
+    if (mine) return mine;
+  }
   const hits = groups.flatMap((g) => g.items).filter((i) => i.own === own && i.match.some((m) => path === m || path.startsWith(`${m}/`)));
   if (hits.length < 2) return hits[0];
   const scope = pm === "MD" || pm.startsWith("MD_") ? "MD" : pm === "PM" || pm.startsWith("PM_") ? "PM" : "";

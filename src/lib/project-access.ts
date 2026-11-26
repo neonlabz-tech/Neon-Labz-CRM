@@ -84,18 +84,27 @@ export async function findProject(user: Pick<SessionUser, "role" | "username">, 
   return Project.findOne({ code, ...(await visibleProjectFilter(user)) });
 }
 
-/** Employees must be real, active employee logins. */
-export async function validEmployeeCodes(codes: string[]): Promise<string[]> {
+/** Logins a milestone or a task can go to: employees, plus Project Managers and Marketing heads. */
+const ASSIGNABLE_ROLES: Array<"employee" | "pm" | "marketing"> = ["employee", "pm", "marketing"];
+
+/**
+ * Keeps only real, active logins that `by` may assign work to. Everyone may pick employees; the Super Admin may also pick any
+ * Project Manager or Marketing head; a Project Manager or Marketing head may pick only themselves.
+ */
+export async function validEmployeeCodes(codes: string[], by?: Pick<SessionUser, "role" | "username">): Promise<string[]> {
   const wanted = [...new Set(codes.filter((c) => USERNAME_PATTERN.test(c)))];
   if (!wanted.length) return [];
   await connectDb();
-  const rows = await User.find({ username: { $in: wanted }, role: "employee", active: true }).select("username").lean();
-  return rows.map((r) => r.username);
+  const rows = await User.find({ username: { $in: wanted }, role: { $in: ASSIGNABLE_ROLES }, active: true }).select("username role").lean();
+  return rows.filter((r) => r.role === "employee" || by?.role === "superadmin" || r.username === by?.username).map((r) => r.username);
 }
 
+/** Everyone work can be assigned to: employees first, then Project Managers, then Marketing heads. */
 export async function activeEmployees() {
   await connectDb();
-  return User.find({ role: "employee", active: true }).select("username fullName").sort({ username: 1 }).lean();
+  const rows = await User.find({ role: { $in: ASSIGNABLE_ROLES }, active: true }).select("username fullName role").sort({ username: 1 }).lean();
+  const rank = (role: string) => (ASSIGNABLE_ROLES as string[]).indexOf(role);
+  return rows.sort((a, b) => rank(a.role) - rank(b.role) || a.username.localeCompare(b.username));
 }
 
 /** An employee works on a milestone when it names them, or names nobody and they are on that team. */
@@ -146,11 +155,11 @@ export async function syncProjectStatus(projectId: mongoose.Types.ObjectId) {
   if (Object.keys(update).length) await Project.updateOne({ _id: projectId }, update);
 }
 
-/** Employee logins that belong to a Marketing department; everyone else is on the software side. */
+/** Logins on the marketing side: employees in a Marketing department, and the Marketing heads (MD). Everyone else is on the software side. */
 export async function marketingUsernames(): Promise<Set<string>> {
   await connectDb();
   const departments = await Department.find({ role: "marketing" }).select("_id").lean();
-  if (!departments.length) return new Set();
-  const rows = await Employee.find({ department: { $in: departments.map((d) => d._id) } }).select("username").lean();
-  return new Set(rows.map((r) => r.username));
+  const rows = departments.length ? await Employee.find({ department: { $in: departments.map((d) => d._id) } }).select("username").lean() : [];
+  const heads = await User.find({ role: "marketing" }).select("username").lean();
+  return new Set([...rows.map((r) => r.username), ...heads.map((h) => h.username)]);
 }
