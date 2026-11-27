@@ -6,10 +6,10 @@ export default async function HrmsLayout({ children }: { children: React.ReactNo
   await requireAction("hrms.manage");
   return (
     <>
-      <PageHeader title="HR" subtitle="People, departments, leave and company activities." />
+      <PageHeader title="HRM" subtitle="People, departments, leave, activities and productivity." />
       <SubNav tabs={[
         { href: "/hrms", label: "Employees" }, { href: "/hrms/departments", label: "Departments" },
-        { href: "/hrms/leaves", label: "Leave" }, { href: "/hrms/activities", label: "Activities" },
+        { href: "/hrms/leaves", label: "Leave" }, { href: "/hrms/activities", label: "Activities" }, { href: "/hrms/productivity", label: "Productivity" },
       ]} />
       {children}
     </>

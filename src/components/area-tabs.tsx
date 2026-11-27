@@ -8,7 +8,7 @@ import { activeItem, type NavGroup } from "@/lib/nav";
 export function AreaTabs({ groups }: { groups: NavGroup[] }) {
   const path = usePathname();
   const params = useSearchParams();
-  const item = activeItem(groups, path, params.get("own") === "1", params.get("pm") ?? "");
+  const item = activeItem(groups, path, params.get("own") === "1", params.get("pm") ?? "", params.get("work") === "1");
   if (!item || item.tabs.length === 0) return null;
   return <SubNav tabs={item.tabs} scope={item.scope} prefix />;
 }

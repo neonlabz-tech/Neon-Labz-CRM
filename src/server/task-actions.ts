@@ -54,8 +54,8 @@ export async function saveTaskAction(_: ActionState, formData: FormData): Promis
     assigneeCode = user.username;
   } else {
     if (!canManageDepartment(user.role, project.type, lane)) return fail("You cannot manage tasks in this part of the project.");
-    if (assigneeCode && !(await validEmployeeCodes([assigneeCode])).length) return fail("Choose an active employee.");
-    if (assigneeCode && (await marketingUsernames()).has(assigneeCode) !== (lane === "marketing")) return fail(lane === "marketing" ? "Choose an employee from the marketing team." : "Choose an employee from the software team.");
+    if (assigneeCode && !(await validEmployeeCodes([assigneeCode], user)).length) return fail("Choose an active person from the list.");
+    if (assigneeCode && (await marketingUsernames()).has(assigneeCode) !== (lane === "marketing")) return fail(lane === "marketing" ? "Choose someone from the marketing team." : "Choose someone from the software team.");
     if (assigneeCode && milestone.assignees.length && !milestone.assignees.includes(assigneeCode)) return fail("Assign that employee to this milestone first.");
   }
 

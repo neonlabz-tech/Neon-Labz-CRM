@@ -67,7 +67,8 @@ export default async function MilestonesPage({ searchParams }: { searchParams: P
     marketingUsernames(),
   ]);
   const partsOf = (type: ProjectType): Department[] => (["software", "marketing"] as Department[]).filter((d) => admin || canManageDepartment(user.role, type, d));
-  const employees = people.map((e) => ({ username: e.username, label: e.fullName ? `${e.fullName} (${e.username})` : e.username }));
+  // Employees, plus the Project Managers and Marketing heads: the Super Admin sees all of them; a PM or MD sees the employees and themselves.
+  const employees = people.filter((e) => e.role === "employee" || admin || e.username === user.username).map((e) => ({ username: e.username, label: e.fullName ? `${e.fullName} (${e.username})` : e.username }));
   const software = employees.filter((e) => !marketingSet.has(e.username));
   const marketing = employees.filter((e) => marketingSet.has(e.username));
   const mixed = employees.map((e) => ({ ...e, label: `${e.label} · ${marketingSet.has(e.username) ? "Marketing" : "Software"}` }));

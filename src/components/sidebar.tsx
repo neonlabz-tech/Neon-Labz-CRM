@@ -21,7 +21,7 @@ export function Sidebar({ groups, name, roleLabel, collapsedByDefault, bell }: P
   const pathname = usePathname();
   const params = useSearchParams();
   const own = params.get("own") === "1";
-  const current = activeItem(groups, pathname, own, params.get("pm") ?? "");
+  const current = activeItem(groups, pathname, own, params.get("pm") ?? "", params.get("work") === "1");
   const [collapsed, setCollapsed] = useState(collapsedByDefault);
   const [open, setOpen] = useState(false);
 
