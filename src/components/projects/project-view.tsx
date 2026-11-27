@@ -70,12 +70,12 @@ export function ProjectView({ project, parts, partsLine, milestones, tasks: allT
                         {mTasks.length > 0 && (
                           <ul className="space-y-2 border-t border-brand-100 bg-white p-3">
                             {mTasks.map((t) => (
-                              <li key={String(t._id)} className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line border-l-4 px-3 py-2 ${t.status === "done" ? "border-l-success" : t.status === "completed" ? "border-l-warning" : t.status === "in-progress" ? "border-l-brand-500" : "border-l-line"}`}>
+                              <li key={String(t._id)} className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line border-l-4 px-3 py-2 ${t.status === "done" ? "border-l-success" : t.status === "completed" || t.status === "waiting" ? "border-l-warning" : t.status === "in-progress" ? "border-l-brand-500" : "border-l-line"}`}>
                                 <div className="min-w-0">
                                   <p className="font-medium"><span className="mr-1.5 text-xs font-normal text-muted">{t.code}</span>{t.title}</p>
                                   <p className="text-xs text-muted">{t.assigneeCode || "Not assigned"}{t.dueDate ? ` · due ${t.dueDate}` : ""} · <span className="capitalize">{t.priority}</span></p>
                                 </div>
-                                <Badge tone={t.status === "done" ? "success" : t.status === "completed" ? "warning" : "info"}>{TASK_STATUS[t.status as keyof typeof TASK_STATUS]}</Badge>
+                                <Badge tone={t.status === "done" ? "success" : t.status === "completed" || t.status === "waiting" ? "warning" : "info"}>{TASK_STATUS[t.status as keyof typeof TASK_STATUS]}</Badge>
                               </li>
                             ))}
                           </ul>

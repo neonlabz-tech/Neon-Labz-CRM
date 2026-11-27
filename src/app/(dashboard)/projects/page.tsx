@@ -65,7 +65,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     Project.countDocuments(where),
     Project.find({ $and: scope }).select("status type softwareStatus marketingStatus archived").lean(),
     viewOnly ? User.find({ role: { $in: ["pm", "marketing"] } }).select("username fullName").sort({ username: 1 }).lean() : [],
-    user.role === "pm" || viewOnly ? Lead.find({ status: "Converted" }).select("business phone email address owner notes next date").sort({ updatedAt: -1 }).limit(50).lean() : [],
+    viewOnly ? Lead.find({ status: "Converted" }).select("business phone email address owner notes next date").sort({ updatedAt: -1 }).limit(50).lean() : [],
     activeEmployees(),
     marketingUsernames(),
   ]);
@@ -196,7 +196,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         />
       )}
       <Pagination page={page} total={total} query={{ q, type, status, archived: showArchived ? "1" : "", ...keep }} />
-      {(user.role === "pm" || viewOnly) && !showArchived && (
+      {viewOnly && !showArchived && (
         <section className="mt-8">
           <h2 className="text-lg font-bold">From sales</h2>
           <p className="mb-3 text-sm text-muted">Clients whose follow-up was marked Converted. Sales sends these projects to the project manager.</p>

@@ -1,17 +1,18 @@
 import { Field, SelectField } from "@/components/ui/field";
 import { RichText } from "@/components/ui/rich-text";
 import { ActionForm } from "@/components/ui/form";
-import { PRIORITY, TASK_STATUS } from "@/lib/projects";
+import { PRIORITY, taskStatusKeys, TASK_STATUS } from "@/lib/projects";
 import { saveTaskAction } from "@/server/task-actions";
 
 export type TaskView = {
   id: string; code: string; title: string; priority: string; assigneeCode: string; startDate: string; dueDate: string;
   description: string; status: string;
 };
-type Props = { projectCode: string; milestoneId: string; task?: TaskView; employees: { username: string; label: string }[]; manager: boolean; minDate?: string; maxDate?: string };
+type Props = { projectCode: string; milestoneId: string; task?: TaskView; employees: { username: string; label: string }[]; manager: boolean; department?: string; minDate?: string; maxDate?: string };
 
-export function TaskForm({ projectCode, milestoneId, task, employees, manager, minDate, maxDate }: Props) {
-  const statuses = Object.entries(TASK_STATUS).filter(([key]) => manager || key !== "done");
+export function TaskForm({ projectCode, milestoneId, task, employees, manager, department = "software", minDate, maxDate }: Props) {
+  const allowed = taskStatusKeys(department);
+  const statuses = Object.entries(TASK_STATUS).filter(([key]) => allowed.includes(key as keyof typeof TASK_STATUS) && (manager || (key !== "done" && key !== "waiting")));
   return (
     <ActionForm action={saveTaskAction} submit={task ? "Save task" : "Add task"} resetOnSuccess={!task} className="grid gap-3 sm:grid-cols-2">
       <input type="hidden" name="projectCode" value={projectCode} />

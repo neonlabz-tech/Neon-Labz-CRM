@@ -7,6 +7,7 @@ import { addDays, ISO_DATE, todayISO } from "@/lib/dates";
 import { connectDb } from "@/lib/db";
 import { param, type SearchParams } from "@/lib/pagination";
 import { activeEmployees, marketingUsernames } from "@/lib/project-access";
+import { NON_APPROVED, scoreFor } from "@/lib/productivity";
 import { TASK_STATUS } from "@/lib/projects";
 import { companyGoals } from "@/lib/sales-targets";
 import { cn } from "@/lib/utils";
@@ -21,12 +22,7 @@ export const metadata = { title: "HR · Productivity" };
 const TEAMS = [["all", "Everyone"], ["software", "Software"], ["marketing", "Marketing"], ["sales", "Sales"]] as const;
 const RANGES = [["week", "Last 7 days", 7], ["month", "Last 30 days", 30], ["year", "Last 12 months", 365]] as const;
 const OPEN = ["not-started", "in-progress"];
-/** Software and Marketing: how much of the period's work was finished (80%) and how much of it is not overdue (20%). */
-const FINISHED_WEIGHT = 0.8;
-/** Points taken off the score for each day of non-approved leave. */
-const LEAVE_PENALTY = 2;
-const NON_APPROVED = "Non-approved Leave";
-const tone = (status: string): RankItem["tone"] => (status === "done" ? "success" : status === "completed" ? "info" : status === "in-progress" ? "warning" : "brand");
+const tone = (status: string): RankItem["tone"] => (status === "done" ? "success" : status === "completed" || status === "waiting" ? "info" : status === "in-progress" ? "warning" : "brand");
 
 type Row = { username: string; name: string; team: ChartTeam; assigned: number; overdue: number; completed: number; converted: number; leave: number; nonApproved: number };
 
@@ -93,7 +89,7 @@ export default async function HrmsProductivityPage({ searchParams }: { searchPar
     const row = rows.get(t.assigneeCode);
     if (!row) continue;
     const finishedAt = t.completedAt ?? t.doneAt;
-    const finished = t.status === "completed" || t.status === "done";
+    const finished = t.status === "completed" || t.status === "waiting" || t.status === "done";
     const open = OPEN.includes(t.status);
     const late = open && Boolean(t.dueDate) && t.dueDate < today;
     const assignedNow = inRange((t as { createdAt?: Date }).createdAt);
@@ -123,20 +119,9 @@ export default async function HrmsProductivityPage({ searchParams }: { searchPar
     if (l.type === NON_APPROVED) row.nonApproved += 1;
   }
 
-  // Score out of 100 for everyone, so the teams can be ranked together. Nobody scores without work to measure.
-  const monthlyGoal = goals.monthlyConversions;
-  const periodGoal = (monthlyGoal * span) / 30;
-  const scoreOf = (r: Row): number | null => {
-    let score: number | null = null;
-    if (r.team === "sales") {
-      if (periodGoal > 0) score = Math.min(100, (r.converted / periodGoal) * 100);
-    } else if (r.assigned >= 1) {
-      const finished = Math.min(100, (r.completed / r.assigned) * 100);
-      const onTime = (Math.max(0, r.assigned - r.overdue) / r.assigned) * 100;
-      score = FINISHED_WEIGHT * finished + (1 - FINISHED_WEIGHT) * onTime;
-    }
-    return score === null ? null : Math.max(0, Math.round(score - LEAVE_PENALTY * r.nonApproved));
-  };
+  // Score out of 100 for everyone, so the teams can be ranked together (the same score each person sees beside the bell).
+  const periodGoal = (goals.monthlyConversions * span) / 30;
+  const scoreOf = (r: Row) => scoreFor(r, periodGoal);
   const scored = [...rows.values()].map((r) => ({ ...r, score: scoreOf(r) }));
   const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
   // Best score first; then more finished or converted, then fewer days of leave, then name.
@@ -155,7 +140,7 @@ export default async function HrmsProductivityPage({ searchParams }: { searchPar
   };
   const sum = (key: "completed" | "converted" | "leave") => scored.reduce((n, r) => n + r[key], 0);
   const label = range === "custom" ? `${from} to ${to}` : RANGES.find(([id]) => id === range)?.[1] ?? "";
-  const noSalesTarget = people.some((p) => p.team === "sales") && monthlyGoal <= 0;
+  const noSalesTarget = people.some((p) => p.team === "sales") && goals.monthlyConversions <= 0;
 
   return (
     <>

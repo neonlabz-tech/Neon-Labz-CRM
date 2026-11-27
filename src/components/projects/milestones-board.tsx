@@ -10,7 +10,7 @@ import { DialogButton } from "@/components/ui/dialog-button";
 import { InlineForms } from "@/components/ui/dialog-shell";
 import { richToHtml } from "@/lib/rich-text";
 import type { Role } from "@/lib/permissions";
-import { canManageDepartment, MILESTONE_STATUS, TASK_STATUS, type Department, type ProjectType } from "@/lib/projects";
+import { canManageDepartment, MILESTONE_STATUS, taskStatusKeys, TASK_STATUS, type Department, type ProjectType } from "@/lib/projects";
 
 type Person = { username: string; label: string };
 export type BoardMilestone = { _id: unknown; title: string; department: string; status: string; startDate?: string; dueDate?: string; assignees: string[] };
@@ -62,11 +62,11 @@ export function MilestonesBoard({ projectCode, type, role, username, milestones,
                 </div>
               </div>
 
-              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {(Object.keys(TASK_STATUS) as (keyof typeof TASK_STATUS)[]).map((status) => (
-                  <TaskColumn key={status} projectCode={projectCode} status={status} title={TASK_STATUS[status]} count={views.filter((t) => t.status === status).length} accepts={!finished && (manager || (isEmployee && status !== "done"))}>
+              <div className={`mt-4 grid gap-3 md:grid-cols-2 ${m.department === "marketing" ? "xl:grid-cols-5" : "xl:grid-cols-4"}`}>
+                {taskStatusKeys(m.department).map((status) => (
+                  <TaskColumn key={status} projectCode={projectCode} status={status} title={TASK_STATUS[status]} count={views.filter((t) => t.status === status).length} accepts={!finished && (manager || (isEmployee && status !== "done" && status !== "waiting"))}>
                     {views.filter((t) => t.status === status).map((t) => (
-                      <TaskCard key={t._id} projectCode={projectCode} milestoneId={id} task={t} manager={manager} mine={t.assigneeCode === username} locked={finished} employees={poolFor(m.department as Department)} minDate={m.startDate} maxDate={m.dueDate} />
+                      <TaskCard key={t._id} projectCode={projectCode} milestoneId={id} task={t} manager={manager} mine={t.assigneeCode === username} locked={finished} department={m.department} employees={poolFor(m.department as Department)} minDate={m.startDate} maxDate={m.dueDate} />
                     ))}
                   </TaskColumn>
                 ))}
@@ -76,7 +76,7 @@ export function MilestonesBoard({ projectCode, type, role, username, milestones,
                 <InlineForms>
                   <details className="mt-4">
                     <summary className="cursor-pointer text-sm font-semibold text-brand-200 hover:text-white">Add a task</summary>
-                    <div className="mt-3 rounded-xl bg-white p-4 text-ink"><TaskForm projectCode={projectCode} milestoneId={id} employees={poolFor(m.department as Department)} manager={manager} minDate={m.startDate} maxDate={m.dueDate} /></div>
+                    <div className="mt-3 rounded-xl bg-white p-4 text-ink"><TaskForm projectCode={projectCode} milestoneId={id} employees={poolFor(m.department as Department)} manager={manager} department={m.department} minDate={m.startDate} maxDate={m.dueDate} /></div>
                   </details>
                 </InlineForms>
               )}
