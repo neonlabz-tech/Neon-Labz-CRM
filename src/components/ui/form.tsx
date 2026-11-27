@@ -2,7 +2,7 @@
 
 import { createContext, Fragment, useActionState, useContext, useEffect, useId, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { Button } from "./button";
 import { useModal } from "./dialog-shell";
 import { useToast } from "./toast";
@@ -23,6 +23,8 @@ type Props = {
   toastOnSuccess?: boolean;
   resetOnSuccess?: boolean;
   className?: string;
+  /** A form shown inline (not in a window) can offer Cancel right beside its submit button. */
+  onCancel?: () => void;
 };
 
 const serialize = (form: HTMLFormElement) =>
@@ -35,7 +37,7 @@ const serialize = (form: HTMLFormElement) =>
  * Nothing resets the form except a successful save (when asked to) or closing the window.
  * A successful save inside a window closes the window.
  */
-export function ActionForm({ action, submit, children, toastOnSuccess = true, resetOnSuccess = false, className }: Props) {
+export function ActionForm({ action, submit, children, toastOnSuccess = true, resetOnSuccess = false, className, onCancel }: Props) {
   const [state, formAction, pending] = useActionState(action, idle);
   const [, startTransition] = useTransition();
   const toast = useToast();
@@ -141,6 +143,7 @@ export function ActionForm({ action, submit, children, toastOnSuccess = true, re
         {pending && <Loader2 className="h-4 w-4 animate-spin" />}
         {submit}
       </Button>
+      {!modal && onCancel && <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}><X className="h-4 w-4" />Cancel</Button>}
     </>
   );
 

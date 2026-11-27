@@ -17,10 +17,11 @@ export function StaffTargetForm({ values }: { values: { username: string; name: 
   );
 }
 
-export function SalesSettingsForm({ values }: { values: { monthlyTarget: string; dailyLeads: string; dailyCalls: string; defaultRate: string } }) {
+export function SalesSettingsForm({ values }: { values: { monthlyTarget: string; monthlyConversions: string; dailyLeads: string; dailyCalls: string; defaultRate: string } }) {
   return (
     <ActionForm action={saveSalesSettingsAction} submit="Save settings" className={grid}>
       <Field label="Company monthly sales target (LKR)" required name="monthlyTarget" type="number" min="0" defaultValue={values.monthlyTarget} />
+      <Field label="Monthly conversions target (clients)" required name="monthlyConversions" type="number" min="0" step="1" defaultValue={values.monthlyConversions} />
       <Field label="Default commission rate (%)" required name="defaultRate" type="number" min="0" max="100" step="0.1" defaultValue={values.defaultRate} />
       <Field label="Daily new leads target" required name="dailyLeads" type="number" min="0" step="1" defaultValue={values.dailyLeads} />
       <Field label="Daily answered calls target" required name="dailyCalls" type="number" min="0" step="1" defaultValue={values.dailyCalls} />

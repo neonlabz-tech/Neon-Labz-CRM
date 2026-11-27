@@ -12,9 +12,9 @@ export default async function SalesSettingsPage() {
   const goals = await companyGoals();
   return (
     <>
-      <PageHeader title="Sales settings" subtitle="Company targets and daily activity goals. A salesperson with no commission rate or daily goals of their own uses these. Sales targets are set for each person under Team." />
+      <PageHeader title="Sales settings" subtitle="Company targets and daily activity goals. A salesperson with no commission rate or daily goals of their own uses these. Sales targets are set for each person under Team. The monthly conversions target is what HRMS Productivity ranks Sales against; 0 leaves Sales unranked." />
       <Card className="max-w-2xl">
-        <SalesSettingsForm values={{ monthlyTarget: String(goals.monthlyTarget), dailyLeads: String(goals.dailyLeads), dailyCalls: String(goals.dailyCalls), defaultRate: String(goals.defaultRate) }} />
+        <SalesSettingsForm values={{ monthlyTarget: String(goals.monthlyTarget), monthlyConversions: String(goals.monthlyConversions), dailyLeads: String(goals.dailyLeads), dailyCalls: String(goals.dailyCalls), defaultRate: String(goals.defaultRate) }} />
       </Card>
     </>
   );

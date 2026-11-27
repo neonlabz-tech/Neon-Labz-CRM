@@ -4,8 +4,8 @@ type Goals = { target: number; rate: number; leads: number; calls: number };
 
 /** Company defaults, or zeros before the Super Admin has saved any. */
 export async function companyGoals() {
-  const saved = await SalesSetting.findOne({ key: "sales" }).select("monthlyTarget dailyLeads dailyCalls defaultRate").lean();
-  return { monthlyTarget: saved?.monthlyTarget ?? 0, dailyLeads: saved?.dailyLeads ?? 0, dailyCalls: saved?.dailyCalls ?? 0, defaultRate: saved?.defaultRate ?? 0 };
+  const saved = await SalesSetting.findOne({ key: "sales" }).select("monthlyTarget monthlyConversions dailyLeads dailyCalls defaultRate").lean();
+  return { monthlyTarget: saved?.monthlyTarget ?? 0, monthlyConversions: saved?.monthlyConversions ?? 0, dailyLeads: saved?.dailyLeads ?? 0, dailyCalls: saved?.dailyCalls ?? 0, defaultRate: saved?.defaultRate ?? 0 };
 }
 
 /** A salesperson's own numbers; any left at zero fall back to the company defaults. */

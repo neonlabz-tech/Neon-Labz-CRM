@@ -35,7 +35,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHeader title="Activity log" subtitle="Sign-ins, approvals, deletions and blocked actions." />
+      <PageHeader title="Activity log" subtitle="Sign-ins, approvals, deletions and blocked actions. Entries are kept for 90 days." />
       <SearchBar q={q} placeholder="Search by person or action" />
       {rows.length === 0 ? (
         <EmptyState title="Nothing here yet" text="Activity will show up as people use the CRM." />
