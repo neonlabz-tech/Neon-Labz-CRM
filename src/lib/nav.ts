@@ -130,13 +130,19 @@ const GROUPS: AreaGroup[] = [
       { title: "Clients", icon: "clients", tabs: [{ href: "/clients", label: "Clients", action: "clients.view" }] },
       { title: "Packages", icon: "packages", tabs: [{ href: "/packages", label: "Packages", action: "packages.view" }] },
       { title: "Finance", icon: "finance", tabs: [{ href: "/finance", label: "Finance", action: "finance.view" }] },
-      { title: "HRM", icon: "hrms", tabs: [{ href: "/hrms", label: "HRM", action: "hrms.manage" }] },
+    ],
+  },
+  {
+    title: "HRMS",
+    areas: [
+      { title: "HRMS", icon: "hrms", tabs: [{ href: "/hrms", label: "HRMS", action: "hrms.manage" }] },
+      { title: "People & logins", icon: "users", tabs: [{ href: "/users", label: "People & logins", action: "users.manage" }] },
+      { title: "Productivity", icon: "productivity", tabs: [{ href: "/hrms/productivity", label: "Productivity", action: "hrms.manage" }] },
     ],
   },
   {
     title: "Admin",
     areas: [
-      { title: "People & logins", icon: "users", tabs: [{ href: "/users", label: "People & logins", action: "users.manage" }] },
       { title: "Reports", icon: "mreports", tabs: [{ href: "/company-reports", label: "Reports", action: "reports.company" }] },
       { title: "Activity log", icon: "audit", tabs: [{ href: "/audit", label: "Activity log", action: "audit.view" }] },
     ],
@@ -170,7 +176,11 @@ export function activeItem(groups: NavGroup[], path: string, own: boolean, pm: s
     const mine = groups.flatMap((g) => g.items).find((i) => i.match.includes("/my-work"));
     if (mine) return mine;
   }
-  const hits = groups.flatMap((g) => g.items).filter((i) => i.own === own && i.match.some((m) => path === m || path.startsWith(`${m}/`)));
+  const found = groups.flatMap((g) => g.items).filter((i) => i.own === own && i.match.some((m) => path === m || path.startsWith(`${m}/`)));
+  // When one entry's address starts another's (/hrms and /hrms/productivity), the longer match wins.
+  const depth = (i: NavItem) => Math.max(...i.match.filter((m) => path === m || path.startsWith(`${m}/`)).map((m) => m.length));
+  const best = Math.max(0, ...found.map(depth));
+  const hits = found.filter((i) => depth(i) === best);
   if (hits.length < 2) return hits[0];
   const scope = pm === "MD" || pm.startsWith("MD_") ? "MD" : pm === "PM" || pm.startsWith("PM_") ? "PM" : "";
   return hits.find((i) => i.scope === scope) ?? hits[0];

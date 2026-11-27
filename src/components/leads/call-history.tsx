@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus, X } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { CallFields } from "@/components/leads/call-fields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,11 +35,10 @@ export function CallHistory({ leadId, stage, today, outcomes, stages, calls }: P
 
       {adding && (
         <div className="mb-3">
-          <ActionForm action={closing(addCallAction, () => setAdding(false))} submit="Save log" className="space-y-3">
+          <ActionForm action={closing(addCallAction, () => setAdding(false))} submit="Save log" onCancel={() => setAdding(false)} className="space-y-3">
             <input type="hidden" name="leadId" value={leadId} />
             <CallFields today={today} outcomes={outcomes} stages={stages} stage={stage} legend="New call log" />
           </ActionForm>
-          <Button type="button" size="sm" variant="ghost" className="mt-2" onClick={() => setAdding(false)}><X className="h-4 w-4" />Cancel</Button>
         </div>
       )}
 
@@ -49,12 +48,11 @@ export function CallHistory({ leadId, stage, today, outcomes, stages, calls }: P
           <li key={call.index} className="rounded-xl border border-line bg-white p-3 text-sm">
             {editing === call.index ? (
               <>
-                <ActionForm action={closing(updateCallAction, () => setEditing(null))} submit="Save changes" className="space-y-3">
+                <ActionForm action={closing(updateCallAction, () => setEditing(null))} submit="Save changes" onCancel={() => setEditing(null)} className="space-y-3">
                   <input type="hidden" name="leadId" value={leadId} />
                   <input type="hidden" name="index" value={call.index} />
                   <CallFields today={today} outcomes={outcomes} stages={stages} stage={stage} lockStage={call.index !== latest} defaults={{ outcome: call.outcome, status: call.status, next: call.next, note: call.note }} legend={`Edit call · ${call.when}`} />
                 </ActionForm>
-                <Button type="button" size="sm" variant="ghost" className="mt-2" onClick={() => setEditing(null)}><X className="h-4 w-4" />Cancel</Button>
               </>
             ) : (
               <>

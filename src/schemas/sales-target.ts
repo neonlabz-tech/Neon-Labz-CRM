@@ -13,6 +13,7 @@ export const staffTargetSchema = z.object({
 
 export const salesSettingsSchema = z.object({
   monthlyTarget: z.coerce.number({ error: "Enter zero or more for each setting." }).min(0, "Enter zero or more for each setting.").max(1_000_000_000),
+  monthlyConversions: count("Monthly conversions target must be a whole number, zero or more."),
   dailyLeads: count("Daily lead and call targets must be whole numbers."),
   dailyCalls: count("Daily lead and call targets must be whole numbers."),
   defaultRate: z.coerce.number({ error: "Enter zero or more for each setting." }).min(0, "Enter zero or more for each setting.").max(100, "Commission rate must be between 0 and 100."),
