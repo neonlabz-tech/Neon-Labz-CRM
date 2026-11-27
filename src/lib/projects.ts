@@ -6,7 +6,7 @@ export const DEPARTMENTS = ["software", "marketing"] as const;
 export type Department = (typeof DEPARTMENTS)[number];
 export const PROJECT_STATUS = { "in-progress": "In progress", completed: "Completed", "on-hold": "On hold" } as const;
 export const MILESTONE_STATUS = { pending: "Pending", "in-progress": "In progress", "at-risk": "At risk", done: "Done" } as const;
-export const TASK_STATUS = { "not-started": "To Do", "in-progress": "In Progress", completed: "Ready for review", done: "Done" } as const;
+export const TASK_STATUS = { "not-started": "To Do", "in-progress": "In Progress", completed: "Ready for review", waiting: "Waiting for approval", done: "Done" } as const;
 export const PRIORITY = { critical: "Critical", high: "High", medium: "Medium", low: "Low" } as const;
 
 export type TaskStatus = keyof typeof TASK_STATUS;
@@ -44,9 +44,15 @@ export function canManageDepartment(role: Role, type: ProjectType, department: D
   return false;
 }
 
-/** Employees can set To Do, In Progress and Completed. Only a manager can mark a task Done. */
+/** The statuses a task can have. "Waiting for approval" (waiting on the client) exists only on marketing tasks. */
+export function taskStatusKeys(department: string): TaskStatus[] {
+  return (Object.keys(TASK_STATUS) as TaskStatus[]).filter((s) => s !== "waiting" || department === "marketing");
+}
+
+/** Employees can set To Do, In Progress and Ready for review. Only a manager can set Waiting for approval or Done, or move a task out of them. */
 export function employeeMayMove(current: TaskStatus, next: TaskStatus): boolean {
-  return current !== "done" && next !== "done";
+  const managerOnly = (s: TaskStatus) => s === "done" || s === "waiting";
+  return !managerOnly(current) && !managerOnly(next);
 }
 
 /** A milestone is finished when it has tasks and every one of them is Done; otherwise it is In progress once any task has started, and Pending before that. */
@@ -60,7 +66,7 @@ export function nextMilestoneStatus(current: MilestoneStatus, taskStatuses: Task
 /** Stamps the completed and done times the same way the old board did. */
 export function stampTask(status: TaskStatus, previous: { completedAt?: Date | null; doneAt?: Date | null } = {}) {
   const now = new Date();
-  if (status === "completed") return { completedAt: previous.completedAt ?? now, doneAt: null };
+  if (status === "completed" || status === "waiting") return { completedAt: previous.completedAt ?? now, doneAt: null };
   if (status === "done") return { completedAt: previous.completedAt ?? now, doneAt: previous.doneAt ?? now };
   return { completedAt: null, doneAt: null };
 }

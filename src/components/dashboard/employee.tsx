@@ -11,7 +11,7 @@ import { Task } from "@/models/task";
 import { Badge } from "@/components/ui/badge";
 import { Bars, ChartGrid, Gauge, Hero, Kpis, MiniRing, Panel, PALETTE } from "./widgets";
 
-const finished = (status: string) => status === "completed" || status === "done";
+const finished = (status: string) => status === "completed" || status === "waiting" || status === "done";
 const stamp = (task: { completedAt?: Date | null; doneAt?: Date | null }) => task.completedAt ?? task.doneAt ?? null;
 
 export async function EmployeeDashboard({ username, name, sp }: { username: string; name: string; sp: SearchParams }) {

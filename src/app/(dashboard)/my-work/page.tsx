@@ -60,7 +60,7 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
         <Stat label="To Do" value={count("not-started")} icon={<ListTodo className="h-5 w-5" />} />
         <Stat label="In Progress" value={count("in-progress")} icon={<Clock className="h-5 w-5" />} />
         <Stat label="Overdue" value={overdue} icon={<AlertTriangle className="h-5 w-5" />} />
-        <Stat label="Completed or Done" value={count("completed") + count("done")} icon={<CheckCircle2 className="h-5 w-5" />} />
+        <Stat label="Completed or Done" value={count("completed") + count("waiting") + count("done")} icon={<CheckCircle2 className="h-5 w-5" />} />
       </div>
 
       <h2 className="mb-3 text-lg font-bold">My projects</h2>
@@ -84,14 +84,14 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
       <h2 className="mb-3 text-lg font-bold">My tasks</h2>
       <SearchBar q={q} placeholder="Search by title…" filters={[
         { name: "project", label: "All projects", value: projectFilter, options: projects.map((p) => ({ value: String(p._id), label: p.name })) },
-        { name: "status", label: "All statuses", value: statusFilter, options: Object.entries(TASK_STATUS).map(([value, label]) => ({ value, label })) },
+        { name: "status", label: "All statuses", value: statusFilter, options: Object.entries(TASK_STATUS).filter(([value]) => value !== "waiting" || user.role === "marketing" || count("waiting") > 0).map(([value, label]) => ({ value, label })) },
         { name: "priority", label: "All priorities", value: priorityFilter, options: Object.entries(PRIORITY).map(([value, label]) => ({ value, label })) },
       ]} />
       {shown.length === 0 ? <Card><p className="text-sm text-muted">No tasks match these filters.</p></Card> : (
         <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">
           {shown.map((t) => {
             const project = byProject.get(String(t.projectId));
-            const late = t.dueDate && t.dueDate < today && t.status !== "completed" && t.status !== "done";
+            const late = t.dueDate && t.dueDate < today && t.status !== "completed" && t.status !== "waiting" && t.status !== "done";
             return (
               <li key={t.code} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
                 <div>

@@ -56,6 +56,6 @@ export const taskSchema = z
     startDate: day,
     dueDate: day,
     description: z.string().trim().max(12000).default(""),
-    status: z.enum(["not-started", "in-progress", "completed", "done"]).default("not-started"),
+    status: z.enum(["not-started", "in-progress", "completed", "waiting", "done"]).default("not-started"),
   })
   .refine(ordered, { path: ["dueDate"], message: "Due date cannot be before the start date." });

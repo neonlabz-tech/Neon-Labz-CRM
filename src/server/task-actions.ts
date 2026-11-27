@@ -44,13 +44,14 @@ export async function saveTaskAction(_: ActionState, formData: FormData): Promis
   const lane = milestone.department;
   let assigneeCode = data.assigneeCode;
   let status = data.status as TaskStatus;
+  if (status === "waiting" && lane !== "marketing") return fail("Waiting for approval is only for marketing tasks.");
 
   if (user.role === "employee") {
     if (!employeeOnMilestone(user.username, milestone, project)) return fail("This milestone is not assigned to you.");
     if (milestone.status === "done") return fail("This milestone is finished. Wait for the next assignment.");
     if (existing && existing.assigneeCode !== user.username) return fail("This task belongs to another employee.");
     if (existing?.status === "done") return fail("The project manager has already marked this task done.");
-    if (!employeeMayMove(existing?.status as TaskStatus ?? "not-started", status)) return fail("Only the project manager can mark a task Done.");
+    if (!employeeMayMove(existing?.status as TaskStatus ?? "not-started", status)) return fail("Only the manager can set Done or Waiting for approval, or move a task out of them.");
     assigneeCode = user.username;
   } else {
     if (!canManageDepartment(user.role, project.type, lane)) return fail("You cannot manage tasks in this part of the project.");
@@ -77,6 +78,9 @@ export async function saveTaskAction(_: ActionState, formData: FormData): Promis
   if (user.role !== "employee" && status === "done" && existing?.status !== "done" && assigneeCode) {
     await notifyUsers([assigneeCode], `${user.username} marked “${saved.title}” as done.`, `/projects/${code}`);
   }
+  if (user.role !== "employee" && status === "waiting" && existing?.status !== "waiting" && assigneeCode) {
+    await notifyUsers([assigneeCode], `${user.username} moved “${saved.title}” to Waiting for approval.`, `/projects/${code}`);
+  }
   if (user.role !== "employee" && before === "done" && status !== "done" && assigneeCode) {
     await notifyUsers([assigneeCode], `${user.username} moved “${saved.title}” back to ${TASK_STATUS[status]}.`, `/projects/${code}`);
   }
@@ -96,11 +100,12 @@ export async function moveTaskAction(code: string, taskId: string, status: TaskS
   const task = project ? await Task.findOne({ _id: taskId, projectId: project._id }) : null;
   const milestone = task ? await Milestone.findById(task.milestoneId) : null;
   if (!project || !task || !milestone) return fail("Task not found.");
+  if (status === "waiting" && task.department !== "marketing") return fail("Waiting for approval is only for marketing tasks.");
 
   if (user.role === "employee") {
     if (task.assigneeCode !== user.username) return fail("This task belongs to another employee.");
     if (milestone.status === "done") return fail("This milestone is finished.");
-    if (!employeeMayMove(task.status as TaskStatus, status)) return fail("Only the project manager can mark a task Done.");
+    if (!employeeMayMove(task.status as TaskStatus, status)) return fail("Only the manager can set Done or Waiting for approval, or move a task out of them.");
   } else if (!canManageDepartment(user.role, project.type, task.department)) {
     return fail("You cannot manage tasks in this part of the project.");
   }
@@ -112,6 +117,9 @@ export async function moveTaskAction(code: string, taskId: string, status: TaskS
   await writeAudit(user.username, "task.status", { task: task.title, project: project.name, milestone: milestone.title, from: before, to: status });
   if (user.role !== "employee" && status === "done" && before !== "done" && task.assigneeCode) {
     await notifyUsers([task.assigneeCode], `${user.username} marked “${task.title}” as done.`, `/projects/${code}`);
+  }
+  if (user.role !== "employee" && status === "waiting" && before !== "waiting" && task.assigneeCode) {
+    await notifyUsers([task.assigneeCode], `${user.username} moved “${task.title}” to Waiting for approval.`, `/projects/${code}`);
   }
   if (user.role !== "employee" && before === "done" && status !== "done" && task.assigneeCode) {
     await notifyUsers([task.assigneeCode], `${user.username} moved “${task.title}” back to ${TASK_STATUS[status]}.`, `/projects/${code}`);

@@ -6,22 +6,23 @@ import { Badge } from "@/components/ui/badge";
 import { ConfirmButton } from "@/components/ui/confirm";
 import { DialogButton } from "@/components/ui/dialog-button";
 import { useToast } from "@/components/ui/toast";
-import { PRIORITY, TASK_STATUS, type TaskStatus } from "@/lib/projects";
+import { PRIORITY, taskStatusKeys, TASK_STATUS, type TaskStatus } from "@/lib/projects";
 import { deleteTaskAction, moveTaskAction } from "@/server/task-actions";
 import { TaskForm, type TaskView } from "./task-form";
 
 type Props = {
-  projectCode: string; milestoneId: string; task: TaskView; manager: boolean; mine: boolean; locked: boolean;
+  projectCode: string; milestoneId: string; task: TaskView; manager: boolean; mine: boolean; locked: boolean; department: string;
   employees: { username: string; label: string }[]; minDate?: string; maxDate?: string;
 };
 
 const tone = { critical: "danger", high: "warning", medium: "info", low: "brand" } as const;
 
-export function TaskCard({ projectCode, milestoneId, task, manager, mine, locked, employees, minDate, maxDate }: Props) {
+export function TaskCard({ projectCode, milestoneId, task, manager, mine, locked, department, employees, minDate, maxDate }: Props) {
   const [pending, start] = useTransition();
   const toast = useToast();
-  const canMove = manager || (mine && !locked && task.status !== "done");
-  const options = Object.entries(TASK_STATUS).filter(([key]) => manager || key !== "done") as [TaskStatus, string][];
+  const canMove = manager || (mine && !locked && task.status !== "done" && task.status !== "waiting");
+  const allowed = taskStatusKeys(department);
+  const options = Object.entries(TASK_STATUS).filter(([key]) => allowed.includes(key as TaskStatus) && (manager || (key !== "done" && key !== "waiting"))) as [TaskStatus, string][];
 
   return (
     <article
@@ -49,7 +50,7 @@ export function TaskCard({ projectCode, milestoneId, task, manager, mine, locked
         ) : <Badge tone="success">{TASK_STATUS[task.status as TaskStatus]}</Badge>}
         {manager && (
           <DialogButton label="Edit task" title="Edit task" subtitle={`${task.code} · ${task.title}`} icon={<Pencil className="h-4 w-4" />}>
-            <TaskForm projectCode={projectCode} milestoneId={milestoneId} task={task} employees={employees} manager={manager} minDate={minDate} maxDate={maxDate} />
+            <TaskForm projectCode={projectCode} milestoneId={milestoneId} task={task} employees={employees} manager={manager} department={department} minDate={minDate} maxDate={maxDate} />
           </DialogButton>
         )}
         {manager && (

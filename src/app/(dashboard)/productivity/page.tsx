@@ -73,7 +73,7 @@ export default async function ProductivityPage({ searchParams }: { searchParams:
   const finished = { $ifNull: ["$completedAt", "$doneAt"] };
   const [perSlot, status, overdue] = await Promise.all([
     Task.aggregate<{ _id: string; n: number }>([
-      { $match: { assigneeCode: user.username, status: { $in: ["completed", "done"] } } },
+      { $match: { assigneeCode: user.username, status: { $in: ["completed", "waiting", "done"] } } },
       { $addFields: { finishedAt: finished } },
       { $match: { finishedAt: { $gte: since, $lte: until } } },
       { $group: { _id: { $dateToString: { format: monthly ? "%Y-%m" : "%Y-%m-%d", date: "$finishedAt", timezone: "Asia/Colombo" } }, n: { $sum: 1 } } },

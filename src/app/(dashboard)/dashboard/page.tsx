@@ -51,7 +51,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   return (
     <>
       {board}
-      <Notices username={user.username} />
+      {/* The Project Manager reads these on the Notifications page, so the card is not repeated on their dashboard. */}
+      {user.role !== "pm" && <Notices username={user.username} />}
     </>
   );
 }

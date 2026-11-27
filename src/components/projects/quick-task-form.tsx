@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Field, SelectField } from "@/components/ui/field";
 import { RichText } from "@/components/ui/rich-text";
 import { ActionForm } from "@/components/ui/form";
-import { PRIORITY, TASK_STATUS } from "@/lib/projects";
+import { PRIORITY, taskStatusKeys, TASK_STATUS } from "@/lib/projects";
 import { saveTaskAction } from "@/server/task-actions";
 
 type MilestoneOption = { id: string; title: string; department: "software" | "marketing"; finished: boolean; assignees: string[]; startDate?: string; dueDate?: string };
@@ -35,7 +35,7 @@ export function QuickTaskForm({ projectCode, milestones, employees }: Props) {
       </SelectField>
       <div className="sm:col-span-2"><Field label="Task" name="title" required /></div>
       <SelectField label="Status" name="status" defaultValue="not-started">
-        {Object.entries(TASK_STATUS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        {Object.entries(TASK_STATUS).filter(([key]) => taskStatusKeys(chosen?.department ?? "software").includes(key as keyof typeof TASK_STATUS)).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
       </SelectField>
       <span />
       <Field label="Start" name="startDate" type="date" min={chosen?.startDate || undefined} max={chosen?.dueDate || undefined} />
